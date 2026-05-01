@@ -1,0 +1,16 @@
+{
+  "name": "facebook-marketplace-enhancer-extension",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Chrome extension (Manifest V3). See README.md in this folder.",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.2"
+  }
+}

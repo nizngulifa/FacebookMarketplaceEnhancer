@@ -1,6 +1,12 @@
 # FacebookMarketplaceEnhancer
 
-Local Postgres + Cursor MCP setup.
+Local Postgres + Cursor MCP setup, plus a Chrome extension under `extension/`.
+
+## Chrome extension
+
+The Manifest V3 extension is a separate subproject. Build instructions, folder layout, and dev workflow:
+
+**[extension/README.md](extension/README.md)**
 
 ## Start local database
 
@@ -75,3 +81,4 @@ When you're ready for hosted Postgres (Neon/RDS/Supabase), only replace the conn
 
 - `.cursor/mcp.json`
 - your app/runtime env var (`DATABASE_URL`)
+
