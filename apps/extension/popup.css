@@ -11,8 +11,12 @@ body {
 }
 
 .panel {
-  width: 280px;
+  width: 360px;
+  max-height: 520px;
   padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .title {
@@ -25,4 +29,75 @@ body {
   margin: 0;
   color: #5c5c5c;
   line-height: 1.4;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: #1877f2;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #166fe5;
+}
+
+.btn:active {
+  background: #1464d4;
+}
+
+.meta {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #3a3a3a;
+  background: #fff;
+  border: 1px solid #e3e5e8;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msg {
+  margin: 0;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e3e5e8;
+  border-radius: 8px;
+}
+
+.msg-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b6b6b;
+  margin-bottom: 4px;
+}
+
+.msg-body {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

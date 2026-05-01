@@ -6,6 +6,7 @@ async function run() {
   const ctx = await esbuild.context({
     entryPoints: {
       popup: "src/popup/popup.ts",
+      content: "src/content/messenger.ts",
     },
     bundle: true,
     outdir: "dist",

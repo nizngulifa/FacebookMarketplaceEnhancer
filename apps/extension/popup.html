@@ -3,13 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Hello World</title>
+    <title>Marketplace Enhancer</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="panel">
-      <h1 class="title">TS + esbuild verify</h1>
-      <p class="sub" id="status">Extension loaded.</p>
+      <h1 class="title">Messenger thread</h1>
+      <p class="sub" id="status">Open a chat on messenger.com, then tap Refresh.</p>
+      <div class="toolbar">
+        <button type="button" class="btn" id="refresh">Refresh</button>
+      </div>
+      <p class="meta" id="meta" hidden></p>
+      <ul class="messages" id="messages" aria-label="Mounted messages"></ul>
     </main>
     <script src="dist/popup.js"></script>
   </body>

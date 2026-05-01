@@ -1,10 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "Hello World",
+  "name": "Facebook Marketplace Enhancer",
   "version": "1.0.0",
-  "description": "Minimal hello-world extension for local development.",
+  "description": "Read mounted Messenger thread messages from the page for Marketplace workflows.",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://www.messenger.com/*",
+    "https://messenger.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Hello World"
-  }
+    "default_title": "Marketplace Enhancer"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.messenger.com/*",
+        "https://messenger.com/*"
+      ],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
