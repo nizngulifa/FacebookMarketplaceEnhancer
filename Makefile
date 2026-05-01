@@ -1,6 +1,6 @@
 # Canonical tasks for humans and agents. Run from repo root.
 
-.PHONY: help db-up db-down db-ps db-seed extension-install extension-build extension-watch compose-check
+.PHONY: help db-up db-down db-ps db-seed extension-install extension-build extension-watch compose-check brain-install brain-predict
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,8 @@ help:
 	@echo "  extension-build    Build Chrome extension to apps/extension/dist/"
 	@echo "  extension-watch    Rebuild extension on file changes"
 	@echo "  compose-check    Validate docker-compose.yml"
+	@echo "  brain-install    Python venv + editable install for packages/brain"
+	@echo "  brain-predict    Run seller reply CLI (default: packages/brain fixture)"
 
 db-up:
 	docker compose up -d
@@ -36,3 +38,11 @@ extension-watch:
 
 compose-check:
 	docker compose config
+
+brain-install:
+	cd packages/brain && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+FILE ?= fixtures/example_marketplace.json
+
+brain-predict:
+	cd packages/brain && .venv/bin/fme-brain "$(FILE)"

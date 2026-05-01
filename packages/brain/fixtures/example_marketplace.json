@@ -1,0 +1,7 @@
+{
+  "messages": [
+    { "role": "buyer", "text": "Hi, is this still available?" },
+    { "role": "seller", "text": "Yes, it is. Are you interested?" },
+    { "role": "buyer", "text": "Sure, what is the address?" }
+  ]
+}
