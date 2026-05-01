@@ -8,8 +8,8 @@ This repository holds **independent** pieces that share a git history and docs. 
 | `db/` | SQL init, migrations, seeds for local Postgres | Applied via Docker; see [db/README.md](../db/README.md) |
 | `docker-compose.yml` | Local Postgres service (`fme-postgres`) | `make db-up`, `make db-seed` |
 | `.cursor/mcp.json` | Cursor MCP: Postgres server against `127.0.0.1:5432` | Requires DB running |
-| `docs/` | MCP prompts and this map | — |
-| `packages/brain/` | Python: chat → seller next-message (OpenAI), local CLI | See `packages/brain/README.md` |
+| `docs/` | MCP prompts, monorepo map, brain architecture | [docs/brain.md](brain.md) for `packages/brain/` |
+| `packages/brain/` | Python: chat → seller next-message (OpenAI), local CLI | [README](../packages/brain/README.md), [docs/brain.md](brain.md) |
 
 ## New work: where does it go?
 
@@ -20,4 +20,4 @@ This repository holds **independent** pieces that share a git history and docs. 
 
 ## Root shortcuts
 
-From the repo root, `Makefile` targets wrap the common flows (`make help`). npm workspaces live at the root: `npm install` once, then `npm run build:extension`.
+From the repo root, `Makefile` targets wrap the common flows (`make help`). npm workspaces live at the root: `npm install` once, then `npm run build:extension`. Python brain: `make brain-install`, `make brain-predict` (see [docs/brain.md](brain.md)).

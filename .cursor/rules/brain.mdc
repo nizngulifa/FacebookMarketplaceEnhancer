@@ -1,0 +1,14 @@
+---
+description: Python sales-brain LLM package under packages/brain
+globs: packages/brain/**/*
+alwaysApply: false
+---
+
+# Brain (`packages/brain`)
+
+- **Deep dive:** [docs/brain.md](../../docs/brain.md) — architecture, extension boundaries, how to extend models and prompts.
+- **Secrets:** `OPENAI_API_KEY` / optional `OPENAI_MODEL` in `packages/brain/.env` or repo root `.env` (gitignored). Never put keys in the extension.
+- **Iterate prompts** in `src/fme_brain/prompts.py`; **contract** in `models.py`; **API call** in `predict.py`.
+- **CLI:** `fme-brain <file.json>` or `fme-brain -` (stdin) after `pip install -e ".[dev]"` in a venv; `make brain-predict` from repo root.
+- **Tests:** `pytest` in `packages/brain` (parsing tests are offline). After substantive changes, run a live fixture smoke test if the maintainer has API access.
+- **No HTTP server** in this package yet; keep the public Python entry `predict_seller_reply` stable for a future backend or scripts.
