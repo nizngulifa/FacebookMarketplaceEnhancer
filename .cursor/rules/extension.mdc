@@ -6,7 +6,8 @@ alwaysApply: false
 
 # Extension (`apps/extension`)
 
-- **Build:** esbuild bundles TS → `dist/`. After changes, run `npm run build` here or `npm run build:extension` from repo root; reload the unpacked extension in Chrome.
+- **Build:** esbuild bundles TS → `dist/`. **After edits in this folder, run a build without asking** — prefer `make extension-build` from repo root, or `npm run build` here. The maintainer verifies on a real **messenger.com** tab; builds keep that loop fast.
+- **Reload:** Unpacked load path is `apps/extension/`. On the maintainer’s machine, Chrome often applies updates when `dist/` or static files change, without a manual **Reload** on `chrome://extensions`. If behavior looks stale, reopen the popup or reload the extension once.
 - **Entry points:** Add keys in `esbuild.config.js` and reference output JS from HTML or `manifest.json`.
-- **Structure:** `src/popup/` for popup entry; `src/lib/` for shared helpers; future `src/content/`, `src/background/` as needed.
+- **Structure:** `src/popup/` for popup entry; `src/content/` for content scripts; `src/lib/` for shared helpers; future `src/background/` as needed.
 - **Load path:** Chrome “Load unpacked” → directory `apps/extension/` (must contain `dist/` after build).

@@ -73,7 +73,7 @@ async function loadSnapshot(): Promise<void> {
     snapshot = await chrome.tabs.sendMessage(tab.id, { type: FME_GET_THREAD_SNAPSHOT });
   } catch {
     setStatus(
-      "Could not reach the page script. Reload the Messenger tab, then tap Refresh again.",
+      "Could not reach the page script. Reload the Messenger tab, then tap Reload messages again.",
     );
     setMeta("", false);
     renderMessages({ logFound: false, messages: [] });
