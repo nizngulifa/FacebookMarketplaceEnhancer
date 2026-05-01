@@ -1,0 +1,2 @@
+# Chrome user data dir when developing with --user-data-dir
+extension/.chrome-dev-profile/
