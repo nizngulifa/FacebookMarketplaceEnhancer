@@ -1,0 +1,16 @@
+{
+  "name": "facebook-marketplace-enhancer",
+  "private": true,
+  "description": "Monorepo: local Postgres + Chrome extension. See docs/monorepo.md.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build:extension": "npm run build -w facebook-marketplace-enhancer-extension",
+    "watch:extension": "npm run watch -w facebook-marketplace-enhancer-extension",
+    "typecheck:extension": "npm run typecheck -w facebook-marketplace-enhancer-extension"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,12 @@
+---
+description: Monorepo layout, boundaries, and where to put new code
+alwaysApply: true
+---
+
+# FacebookMarketplaceEnhancer monorepo
+
+- **Map:** `docs/monorepo.md` — read before adding top-level folders.
+- **Extension:** `apps/extension/` — MV3 Chrome extension; Node scripts run via workspace from repo root (`npm run build:extension`) or inside `apps/extension/`.
+- **Database:** `db/init` (first boot only), `db/migrations` (manual / incremental), `db/seed` — see `db/README.md`.
+- **Do not** couple extension source to Postgres URLs; no `DATABASE_URL` in extension code. MCP config is `.cursor/mcp.json`.
+- **Prefer** `Makefile` targets from repo root for common tasks (`make help`).

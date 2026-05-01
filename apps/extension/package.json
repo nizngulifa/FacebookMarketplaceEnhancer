@@ -2,7 +2,7 @@
   "name": "facebook-marketplace-enhancer-extension",
   "private": true,
   "version": "1.0.0",
-  "description": "Chrome extension (Manifest V3). See README.md in this folder.",
+  "description": "Chrome extension (Manifest V3) in monorepo apps/extension. See README.md.",
   "scripts": {
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",

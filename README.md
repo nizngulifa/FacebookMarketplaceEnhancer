@@ -1,17 +1,25 @@
 # FacebookMarketplaceEnhancer
 
-Local Postgres + Cursor MCP setup, plus a Chrome extension under `extension/`.
+Local Postgres + Cursor MCP, plus a Manifest V3 Chrome extension. **Repo map:** [docs/monorepo.md](docs/monorepo.md) · **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Chrome extension
 
-The Manifest V3 extension is a separate subproject. Build instructions, folder layout, and dev workflow:
+The extension lives in **`apps/extension/`**:
 
-**[extension/README.md](extension/README.md)**
+**[apps/extension/README.md](apps/extension/README.md)**
+
+From repo root:
+
+```bash
+make extension-install   # once: npm install (workspaces)
+make extension-build
+```
 
 ## Start local database
 
 ```bash
-docker compose up -d
+make db-up
+# or: docker compose up -d
 ```
 
 The initial schema for MVP (`chats`, `messages`) is auto-applied from:
@@ -20,12 +28,13 @@ The initial schema for MVP (`chats`, `messages`) is auto-applied from:
 
 Long-term migration files live in:
 
-`db/migrations/`
+`db/migrations/` — see [db/README.md](db/README.md)
 
 ## Verify Postgres is healthy
 
 ```bash
-docker compose ps
+make db-ps
+# or: docker compose ps
 ```
 
 If you already booted Postgres before the init SQL existed, reset once so init scripts run:
@@ -37,15 +46,11 @@ docker compose up -d
 
 ## Seed sample data
 
-Run this once to create 1 chat and 2 messages:
-
 ```bash
-docker exec -i fme-postgres psql -U postgres -d facebook_marketplace_enhancer < db/seed/001_seed_chats_messages.sql
+make db-seed
 ```
 
 ## Run migration manually (optional)
-
-If you want to apply migration files directly:
 
 ```bash
 docker exec -i fme-postgres psql -U postgres -d facebook_marketplace_enhancer < db/migrations/0001_create_chats_messages.sql
@@ -71,9 +76,10 @@ MCP prompt examples are in:
 
 `docs/mcp-query-prompts.md`
 
-## Git commit smoke test
+## Agent / IDE helpers
 
-A simple docs-only commit can be used to validate local git commit flow.
+- [AGENTS.md](AGENTS.md)
+- `.cursor/rules/`
 
 ## Migrate to hosted later
 
@@ -81,4 +87,3 @@ When you're ready for hosted Postgres (Neon/RDS/Supabase), only replace the conn
 
 - `.cursor/mcp.json`
 - your app/runtime env var (`DATABASE_URL`)
-

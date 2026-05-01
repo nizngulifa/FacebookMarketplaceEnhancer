@@ -1,2 +1,5 @@
 # Chrome user data dir when developing with --user-data-dir
-extension/.chrome-dev-profile/
+apps/extension/.chrome-dev-profile/
+
+# Root npm workspace dependencies
+node_modules/

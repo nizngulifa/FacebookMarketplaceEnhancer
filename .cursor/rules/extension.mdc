@@ -1,0 +1,12 @@
+---
+description: Chrome extension conventions under apps/extension
+globs: apps/extension/**/*
+alwaysApply: false
+---
+
+# Extension (`apps/extension`)
+
+- **Build:** esbuild bundles TS → `dist/`. After changes, run `npm run build` here or `npm run build:extension` from repo root; reload the unpacked extension in Chrome.
+- **Entry points:** Add keys in `esbuild.config.js` and reference output JS from HTML or `manifest.json`.
+- **Structure:** `src/popup/` for popup entry; `src/lib/` for shared helpers; future `src/content/`, `src/background/` as needed.
+- **Load path:** Chrome “Load unpacked” → directory `apps/extension/` (must contain `dist/` after build).
