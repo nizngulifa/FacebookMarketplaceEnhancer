@@ -1,4 +1,4 @@
-import { runPromptUserOnTab } from "../lib/prompt-via-scripting";
+import { runPromptUserOnTab, runSuggestReplyOnTab } from "../lib/prompt-via-scripting";
 import { getMessengerTab } from "./messenger-tab";
 
 /** Must match `FME_DEBUG_MARKER_ID` in `src/lib/marketplace-ui.ts` (injected `func` cannot close over imports). */
@@ -113,7 +113,7 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
   d.appendDebugLog(`Step 3 Prompt: tabId=${resolved.tabId}`);
 
   const text =
-    "Scroll to the very top of this chat until older messages stop loading. You can dismiss this note anytime; it does not block scrolling.";
+    "Hey there—I haven't actually seen this chat yet. Could you scroll through so I can see it?";
 
   try {
     const result = await runPromptUserOnTab(resolved.tabId, text);
@@ -130,5 +130,35 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
       `Step 3 Prompt: runPromptUserOnTab threw — ${err instanceof Error ? err.message : String(err)}`,
     );
     d.setStatus("Prompt failed — see log.");
+  }
+}
+
+export async function runSelfTestSuggestReply(d: SelfTestDeps): Promise<void> {
+  d.appendDebugLog("Step 4 Suggest: button clicked (runSuggestReplyOnTab → ghost text, main frame)");
+  const resolved = await d.getMessengerTab();
+  if ("error" in resolved) {
+    d.appendDebugLog(`Step 4 Suggest: tab error — ${resolved.error}`);
+    d.setStatus(resolved.error);
+    return;
+  }
+  d.appendDebugLog(`Step 4 Suggest: tabId=${resolved.tabId}`);
+
+  const text = "Hello there";
+
+  try {
+    const result = await runSuggestReplyOnTab(resolved.tabId, text);
+    d.appendDebugLog(`Step 4 Suggest: result JSON — ${JSON.stringify(result)}`);
+    if (!result.ok) {
+      d.setStatus(`Suggest failed: ${result.error}`);
+      return;
+    }
+    d.setStatus(
+      "Suggest ran — ghost text on the composer; Tab inserts, Esc dismisses, typing clears it.",
+    );
+  } catch (err) {
+    d.appendDebugLog(
+      `Step 4 Suggest: runSuggestReplyOnTab threw — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    d.setStatus("Suggest failed — see log.");
   }
 }

@@ -1,10 +1,186 @@
 import { fmeContentLog } from "./fme-content-log";
 
 export const FME_PROMPT_HOST_ID = "fme-marketplace-ui-prompt-host";
+export const FME_SUGGEST_HOST_ID = "fme-marketplace-ui-suggest-host";
 export const FME_DEBUG_MARKER_ID = "fme-debug-marker";
 
 function removeExistingPromptHost(): void {
   document.getElementById(FME_PROMPT_HOST_ID)?.remove();
+}
+
+function removeExistingSuggestHost(): void {
+  document.getElementById(FME_SUGGEST_HOST_ID)?.remove();
+}
+
+/**
+ * Best-effort: Messenger composer is a `contenteditable` with `role="textbox"`.
+ * Prefer the visible candidate closest to the bottom of the viewport (main thread input).
+ */
+export function findMessengerComposer(root: Document): HTMLElement | null {
+  const candidates = Array.from(
+    root.querySelectorAll<HTMLElement>('[contenteditable="true"][role="textbox"]'),
+  );
+  if (candidates.length === 0) return null;
+
+  const vh = root.defaultView?.innerHeight ?? 0;
+  const visible = candidates.filter((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh;
+  });
+  const pool = visible.length > 0 ? visible : candidates;
+  pool.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
+  return pool[0] ?? null;
+}
+
+function placeSuggestOverlay(host: HTMLElement, composer: HTMLElement): void {
+  const r = composer.getBoundingClientRect();
+  const pad = 10;
+  host.style.left = `${Math.max(0, r.left + pad)}px`;
+  host.style.top = `${Math.max(0, r.top + pad)}px`;
+  host.style.width = `${Math.max(0, r.width - pad * 2)}px`;
+  host.style.maxHeight = `${Math.max(0, r.height - pad * 2)}px`;
+}
+
+function commitSuggestionIntoComposer(composer: HTMLElement, text: string): void {
+  composer.focus();
+  const inserted = document.execCommand("insertText", false, text);
+  if (!inserted) {
+    composer.textContent = text;
+    composer.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+/**
+ * Ghost reply suggestion (`MarketplaceUI.suggestReply`): muted overlay on the message composer.
+ * **Tab** inserts the text into the field; **Escape** dismisses. Typing in the composer clears the ghost.
+ */
+export function suggestReply(text: string): void {
+  fmeContentLog("suggestReply:start", { length: text.length });
+  removeExistingSuggestHost();
+
+  const composer = findMessengerComposer(document);
+  if (!composer) {
+    fmeContentLog("suggestReply:no_composer");
+    throw new Error("composer_not_found");
+  }
+
+  const host = document.createElement("div");
+  host.id = FME_SUGGEST_HOST_ID;
+  host.setAttribute("data-fme", "marketplace-ui-suggest");
+  host.style.cssText = [
+    "position:fixed",
+    "margin:0",
+    "padding:0",
+    "border:0",
+    "z-index:2147483646",
+    "pointer-events:none",
+    "display:block",
+    "box-sizing:border-box",
+    "overflow:hidden",
+  ].join(";");
+
+  const shadow = host.attachShadow({ mode: "open" });
+
+  const style = document.createElement("style");
+  style.textContent = `
+    :host {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .ghost {
+      margin: 0;
+      padding: 0;
+      color: rgba(100, 116, 139, 0.92);
+      font-size: 15px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: none;
+    }
+    .hint {
+      margin: 6px 0 0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: rgba(100, 116, 139, 0.75);
+    }
+  `;
+
+  const ghost = document.createElement("p");
+  ghost.className = "ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.textContent = text;
+
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = "Tab to insert · Esc to dismiss";
+
+  shadow.append(style, ghost, hint);
+
+  const root = document.body ?? document.documentElement;
+  root.appendChild(host);
+  placeSuggestOverlay(host, composer);
+
+  const syncPosition = (): void => {
+    if (!document.body?.contains(composer)) {
+      teardown("composer_removed");
+      return;
+    }
+    placeSuggestOverlay(host, composer);
+  };
+
+  let tornDown = false;
+  const teardown = (reason: string): void => {
+    if (tornDown) return;
+    tornDown = true;
+    fmeContentLog("suggestReply:teardown", { reason });
+    window.removeEventListener("scroll", onScrollOrResize, true);
+    window.removeEventListener("resize", onScrollOrResize);
+    document.removeEventListener("keydown", onKeyDown, true);
+    composer.removeEventListener("input", onComposerInput);
+    ro?.disconnect();
+    host.remove();
+  };
+
+  const onScrollOrResize = (): void => {
+    window.requestAnimationFrame(syncPosition);
+  };
+
+  let committingSuggestion = false;
+  const onComposerInput = (): void => {
+    if (committingSuggestion) return;
+    teardown("user_typed");
+  };
+
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      teardown("escape");
+      return;
+    }
+    if (e.key === "Tab" && !e.repeat) {
+      e.preventDefault();
+      committingSuggestion = true;
+      commitSuggestionIntoComposer(composer, text);
+      committingSuggestion = false;
+      teardown("tab_accept");
+    }
+  };
+
+  let ro: ResizeObserver | undefined;
+  if (typeof ResizeObserver !== "undefined") {
+    ro = new ResizeObserver(() => {
+      syncPosition();
+    });
+    ro.observe(composer);
+  }
+
+  window.addEventListener("scroll", onScrollOrResize, true);
+  window.addEventListener("resize", onScrollOrResize);
+  document.addEventListener("keydown", onKeyDown, true);
+  composer.addEventListener("input", onComposerInput);
+
+  fmeContentLog("suggestReply:mounted", { hostId: FME_SUGGEST_HOST_ID });
 }
 
 export type DebugMarkerRect = { x: number; y: number; width: number; height: number };

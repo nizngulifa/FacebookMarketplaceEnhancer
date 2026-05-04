@@ -1,12 +1,14 @@
 import { extractThreadSnapshot, type ThreadSnapshot } from "../lib/messenger-extract";
 import { fmeContentLog } from "../lib/fme-content-log";
-import { FME_GET_THREAD_SNAPSHOT, FME_PROMPT_USER } from "../lib/messenger-protocol";
-import { promptUser } from "../lib/marketplace-ui";
+import { FME_GET_THREAD_SNAPSHOT, FME_PROMPT_USER, FME_SUGGEST_REPLY } from "../lib/messenger-protocol";
+import { promptUser, suggestReply } from "../lib/marketplace-ui";
 
 type ContentResponse =
   | ThreadSnapshot
   | { ok: true; kind: "prompt" }
   | { ok: false; kind: "prompt"; error: string }
+  | { ok: true; kind: "suggest" }
+  | { ok: false; kind: "suggest"; error: string }
   | { kind: "fme_internal"; reason: string; receivedType?: string };
 
 /**
@@ -18,7 +20,11 @@ type ContentResponse =
  * was reliable on messenger.com; `FME_PROMPT_USER` remains for future callers (e.g. orchestrator).
  */
 chrome.runtime.onMessage.addListener(
-  (message: { type?: string; message?: string }, _sender, sendResponse: (p: ContentResponse) => void) => {
+  (
+    message: { type?: string; message?: string; text?: string },
+    _sender,
+    sendResponse: (p: ContentResponse) => void,
+  ) => {
     const reply = (payload: ContentResponse): void => {
       try {
         sendResponse(payload);
@@ -45,6 +51,20 @@ chrome.runtime.onMessage.addListener(
             reply({
               ok: false,
               kind: "prompt",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          return;
+        }
+
+        if (t === FME_SUGGEST_REPLY && typeof message.text === "string") {
+          try {
+            suggestReply(message.text);
+            reply({ ok: true, kind: "suggest" });
+          } catch (err) {
+            reply({
+              ok: false,
+              kind: "suggest",
               error: err instanceof Error ? err.message : String(err),
             });
           }

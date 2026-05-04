@@ -5,6 +5,7 @@ import {
   runSelfTestMarker,
   runSelfTestPing,
   runSelfTestPrompt,
+  runSelfTestSuggestReply,
 } from "./write-path-selftest";
 import { setStatus } from "../lib/status";
 
@@ -116,6 +117,9 @@ function main(): void {
   });
   document.getElementById("st-prompt")?.addEventListener("click", () => {
     void runSelfTestPrompt(selfTestDeps);
+  });
+  document.getElementById("st-suggest")?.addEventListener("click", () => {
+    void runSelfTestSuggestReply(selfTestDeps);
   });
   document.getElementById("st-clear")?.addEventListener("click", () => {
     clearDebugLog();

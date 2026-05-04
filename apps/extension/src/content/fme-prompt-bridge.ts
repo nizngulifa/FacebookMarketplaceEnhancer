@@ -1,3 +1,6 @@
-import { promptUser } from "../lib/marketplace-ui";
+import { promptUser, suggestReply } from "../lib/marketplace-ui";
 
-Object.assign(globalThis as object, { __fmePromptUser: promptUser });
+Object.assign(globalThis as object, {
+  __fmePromptUser: promptUser,
+  __fmeSuggestReply: suggestReply,
+});
