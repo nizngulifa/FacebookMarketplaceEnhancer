@@ -1,5 +1,7 @@
 # Chrome extension
 
+**→ New here?** Read **[docs/extension-for-collaborators.md](../../docs/extension-for-collaborators.md)** first (60-second map, internal APIs, and how to add server / web exposure later).
+
 Manifest V3 extension. Source lives in `src/`; **load unpacked** from **`apps/extension/`** (this directory) **after** a build so `dist/` exists.
 
 > **Path change:** If you still have an unpacked extension pointing at the old `extension/` folder, remove it in `chrome://extensions` and **Load unpacked** → select this `apps/extension` directory.

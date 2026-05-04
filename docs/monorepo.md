@@ -8,12 +8,12 @@ This repository holds **independent** pieces that share a git history and docs. 
 | `db/` | SQL init, migrations, seeds for local Postgres | Applied via Docker; see [db/README.md](../db/README.md) |
 | `docker-compose.yml` | Local Postgres service (`fme-postgres`) | `make db-up`, `make db-seed` |
 | `.cursor/mcp.json` | Cursor MCP: Postgres server against `127.0.0.1:5432` | Requires DB running |
-| `docs/` | MCP prompts, monorepo map, brain architecture | [docs/brain.md](brain.md) for `packages/brain/` |
+| `docs/` | MCP prompts, monorepo map, brain architecture, **extension collaborator guide** | [docs/brain.md](brain.md), [docs/extension-for-collaborators.md](extension-for-collaborators.md) |
 | `packages/brain/` | Python: chat → seller next-message (OpenAI), local CLI | [README](../packages/brain/README.md), [docs/brain.md](brain.md) |
 
 ## New work: where does it go?
 
-- **Extension UI, content scripts, background worker** → `apps/extension/src/` (see that folder’s README).
+- **Extension UI, content scripts, background worker** → `apps/extension/src/` (see [apps/extension/README.md](../apps/extension/README.md); **onboarding + external-integration plan** → [docs/extension-for-collaborators.md](extension-for-collaborators.md)).
 - **Schema or seed data** → `db/migrations/` or `db/seed/` (follow [db/README.md](../db/README.md)).
 - **LLM / sales “brain” (local library & CLI)** → `packages/brain/` (secrets via env, e.g. `OPENAI_API_KEY`; not bundled in the extension).
 - **Future HTTP API or backend** → add something like `services/api/` or `apps/server/` and document it here; keep secrets in root `.env`, not in the extension.
