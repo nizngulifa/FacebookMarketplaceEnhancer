@@ -55,7 +55,7 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `src/popup/messenger-tab.ts` | Resolve the active `messenger.com` tab from the popup |
 | `src/popup/write-path-selftest.ts` | Dev-only “Write path” steps (scripting API) |
 | `src/lib/`           | Shared helpers                                 |
-| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (side panel), debug marker |
+| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (dark assistant chip), debug marker |
 | `src/lib/prompt-via-scripting.ts` | `runPromptUserOnTab` — inject bridge + call `promptUser` via `scripting` |
 | `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` → `runPromptUserOnTab` |
 | `src/content/fme-prompt-bridge.ts` | On-demand bundle: assigns `globalThis.__fmePromptUser` for `scripting` |
@@ -69,7 +69,7 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 
 All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketplace-ui.ts`** so we do not scatter `document.createElement` across the codebase.
 
-- **`promptUser(message)`** — dismissible **side panel** on the **inline-end** edge (usually right in LTR). It does **not** use a full-page dimmer so the user can **keep scrolling** the thread while reading instructions (e.g. “scroll up to load older messages”). **Dismiss** or **Escape** closes it.
+- **`promptUser(message)`** — dismissible **dark assistant chip** on the **inline-end** edge (usually right in LTR): reads as an internal copilot voice, not a tutorial card. No full-page dimmer — the user can **keep scrolling** the thread. **Got it** or **Escape** closes it.
 - **Debug marker** — `injectDebugMarker()` / `#fme-debug-marker` for manual verification only.
 
 ### Who can call `promptUser`?

@@ -2,7 +2,7 @@ export const FME_GET_THREAD_SNAPSHOT = "FME_GET_THREAD_SNAPSHOT" as const;
 /** Popup / background → content: show `MarketplaceUI` prompt (content script uses deferred `sendResponse`). */
 export const FME_PROMPT_USER = "FME_PROMPT_USER" as const;
 /**
- * Extension-internal: popup / side panel / future orchestrator → service worker →
+ * Extension-internal: popup / orchestrator → service worker →
  * `chrome.scripting` + `promptUser` on a Messenger tab. Not callable from arbitrary websites.
  */
 export const FME_BACKGROUND_SHOW_PROMPT = "FME_BACKGROUND_SHOW_PROMPT" as const;

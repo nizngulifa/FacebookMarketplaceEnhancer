@@ -103,7 +103,7 @@ export async function runSelfTestMarker(d: SelfTestDeps): Promise<void> {
 }
 
 export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
-  d.appendDebugLog("Step 3 Prompt: button clicked (runPromptUserOnTab → side panel, main frame)");
+  d.appendDebugLog("Step 3 Prompt: button clicked (runPromptUserOnTab → dark chip, main frame)");
   const resolved = await d.getMessengerTab();
   if ("error" in resolved) {
     d.appendDebugLog(`Step 3 Prompt: tab error — ${resolved.error}`);
@@ -123,7 +123,7 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
       return;
     }
     d.setStatus(
-      "Prompt ran — look for the white instruction card on the inline-end (usually right). Scroll the chat while it is open.",
+      "Prompt ran — look for the dark assistant chip on the inline-end (usually right). Scroll the chat while it is open.",
     );
   } catch (err) {
     d.appendDebugLog(

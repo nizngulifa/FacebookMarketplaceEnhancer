@@ -46,8 +46,8 @@ export function injectDebugMarker(): { rect: DebugMarkerRect } {
 }
 
 /**
- * Non-blocking instruction panel (`MarketplaceUI.promptUser`): docked on the inline-end edge so the
- * user can still scroll the thread (no modal backdrop). Dismiss or Escape to hide.
+ * Non-blocking “internal voice” prompt (`MarketplaceUI.promptUser`): dark assistant chip on the
+ * inline-end edge — scroll-safe, no modal backdrop. **Got it** or **Escape** to hide.
  */
 export function promptUser(message: string): void {
   fmeContentLog("promptUser:start", { length: message.length });
@@ -60,7 +60,7 @@ export function promptUser(message: string): void {
     "position:fixed",
     "inset-inline-end:12px",
     "inset-block-start:max(72px,12vh)",
-    "width:min(300px,40vw)",
+    "width:min(300px,42vw)",
     "max-height:min(46vh,400px)",
     "margin:0",
     "padding:0",
@@ -78,24 +78,27 @@ export function promptUser(message: string): void {
     :host {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    .panel {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    .chip {
       max-height: inherit;
       overflow: auto;
-      padding: 14px 16px;
-      border-radius: 10px;
-      background: #fff;
-      color: #1a1a1a;
-      border: 1px solid #ccd0d5;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+      background: linear-gradient(145deg, #2d3748, #1a202c);
+      color: #f7fafc;
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       box-sizing: border-box;
     }
-    .title {
-      margin: 0;
-      font-size: 14px;
-      font-weight: 600;
+    .row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .glyph {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0.95;
     }
     .body {
       margin: 0;
@@ -103,42 +106,53 @@ export function promptUser(message: string): void {
       line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
+      flex: 1;
+      min-width: 0;
     }
     .actions {
+      margin-top: 10px;
       display: flex;
       justify-content: flex-end;
     }
     button {
       font: inherit;
       font-weight: 600;
-      padding: 7px 12px;
+      font-size: 12px;
+      padding: 6px 12px;
       border-radius: 8px;
       border: none;
       cursor: pointer;
-      background: #1877f2;
-      color: #fff;
+      background: transparent;
+      color: #90cdf4;
     }
     button:hover {
-      background: #166fe5;
+      color: #bee3f8;
+      text-decoration: underline;
     }
     button:focus-visible {
-      outline: 2px solid #1877f2;
+      outline: 2px solid #90cdf4;
       outline-offset: 2px;
+      border-radius: 6px;
     }
   `;
 
-  const panel = document.createElement("div");
-  panel.className = "panel";
-  panel.setAttribute("role", "region");
-  panel.setAttribute("aria-label", "Marketplace Enhancer instructions");
+  const chip = document.createElement("div");
+  chip.className = "chip";
+  chip.setAttribute("role", "status");
+  chip.setAttribute("aria-live", "polite");
+  chip.setAttribute("aria-label", "Copilot note");
 
-  const title = document.createElement("h2");
-  title.className = "title";
-  title.id = "fme-prompt-title";
-  title.textContent = "Next step";
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const glyph = document.createElement("span");
+  glyph.className = "glyph";
+  glyph.setAttribute("aria-hidden", "true");
+  glyph.textContent = "✦";
 
   const body = document.createElement("p");
   body.className = "body";
+  body.id = "fme-prompt-body";
   body.textContent = message;
 
   const actions = document.createElement("div");
@@ -146,7 +160,7 @@ export function promptUser(message: string): void {
 
   const dismissBtn = document.createElement("button");
   dismissBtn.type = "button";
-  dismissBtn.textContent = "Dismiss";
+  dismissBtn.textContent = "Got it";
 
   const dismiss = (): void => {
     document.removeEventListener("keydown", onKeyDown, true);
@@ -161,9 +175,10 @@ export function promptUser(message: string): void {
   dismissBtn.addEventListener("click", dismiss);
   document.addEventListener("keydown", onKeyDown, true);
 
+  row.append(glyph, body);
   actions.appendChild(dismissBtn);
-  panel.append(title, body, actions);
-  shadow.append(style, panel);
+  chip.append(row, actions);
+  shadow.append(style, chip);
   const root = document.body ?? document.documentElement;
   root.appendChild(host);
   fmeContentLog("promptUser:mounted", { hostId: FME_PROMPT_HOST_ID });
