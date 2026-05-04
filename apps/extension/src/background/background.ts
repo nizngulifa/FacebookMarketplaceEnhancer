@@ -58,7 +58,9 @@ chrome.runtime.onMessage.addListener(
   (
     message: { type?: string; text?: string; tabId?: number },
     _sender,
-    sendResponse: (r: { ok: true } | { ok: false; error: string }) => void,
+    sendResponse: (
+      r: { ok: true; logs: string[] } | { ok: false; error: string; logs?: string[] },
+    ) => void,
   ) => {
     if (message?.type !== FME_BACKGROUND_SHOW_SUGGEST_REPLY || typeof message.text !== "string") {
       return;
@@ -84,7 +86,11 @@ chrome.runtime.onMessage.addListener(
         const result = await runSuggestReplyOnTab(tabId, suggestionText);
         sendResponse(result);
       } catch (e) {
-        sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
+        sendResponse({
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+          logs: [`exception: ${e instanceof Error ? e.message : String(e)}`],
+        });
       }
     })();
 

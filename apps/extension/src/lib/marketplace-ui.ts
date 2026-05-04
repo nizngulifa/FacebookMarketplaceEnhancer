@@ -1,4 +1,5 @@
 import { fmeContentLog } from "./fme-content-log";
+import { listMessengerComposerCandidates, pickMessengerComposerElement } from "./messenger-composer";
 
 export const FME_PROMPT_HOST_ID = "fme-marketplace-ui-prompt-host";
 export const FME_SUGGEST_HOST_ID = "fme-marketplace-ui-suggest-host";
@@ -12,33 +13,34 @@ function removeExistingSuggestHost(): void {
   document.getElementById(FME_SUGGEST_HOST_ID)?.remove();
 }
 
-/**
- * Best-effort: Messenger composer is a `contenteditable` with `role="textbox"`.
- * Prefer the visible candidate closest to the bottom of the viewport (main thread input).
- */
+/** @see pickMessengerComposerElement */
 export function findMessengerComposer(root: Document): HTMLElement | null {
-  const candidates = Array.from(
-    root.querySelectorAll<HTMLElement>('[contenteditable="true"][role="textbox"]'),
-  );
-  if (candidates.length === 0) return null;
-
-  const vh = root.defaultView?.innerHeight ?? 0;
-  const visible = candidates.filter((el) => {
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh;
-  });
-  const pool = visible.length > 0 ? visible : candidates;
-  pool.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom);
-  return pool[0] ?? null;
+  return pickMessengerComposerElement(root);
 }
+
+/** Messenger’s composer row is often ~20px tall; never cap the ghost chip to that or it collapses to invisible. */
+const SUGGEST_GHOST_MIN_HEIGHT_PX = 52;
+const SUGGEST_GHOST_MAX_HEIGHT_PX = 220;
 
 function placeSuggestOverlay(host: HTMLElement, composer: HTMLElement): void {
   const r = composer.getBoundingClientRect();
-  const pad = 10;
-  host.style.left = `${Math.max(0, r.left + pad)}px`;
-  host.style.top = `${Math.max(0, r.top + pad)}px`;
-  host.style.width = `${Math.max(0, r.width - pad * 2)}px`;
-  host.style.maxHeight = `${Math.max(0, r.height - pad * 2)}px`;
+  const win = host.ownerDocument.defaultView;
+  const vw = win?.innerWidth ?? 0;
+  const vh = win?.innerHeight ?? 0;
+  const hPad = 10;
+  const vPad = 6;
+
+  const width = Math.min(Math.max(240, r.width - hPad * 2), Math.max(160, vw - 16));
+  const left = Math.max(8, Math.min(r.left + hPad, vw - width - 8));
+  const top = Math.max(8, r.top + vPad);
+  const roomBelow = vh - top - 12;
+  const maxH = Math.max(SUGGEST_GHOST_MIN_HEIGHT_PX, Math.min(SUGGEST_GHOST_MAX_HEIGHT_PX, roomBelow));
+
+  host.style.left = `${left}px`;
+  host.style.top = `${top}px`;
+  host.style.width = `${width}px`;
+  host.style.minHeight = `${SUGGEST_GHOST_MIN_HEIGHT_PX}px`;
+  host.style.maxHeight = `${maxH}px`;
 }
 
 function commitSuggestionIntoComposer(composer: HTMLElement, text: string): void {
@@ -60,7 +62,12 @@ export function suggestReply(text: string): void {
 
   const composer = findMessengerComposer(document);
   if (!composer) {
-    fmeContentLog("suggestReply:no_composer");
+    const candidates = listMessengerComposerCandidates(document);
+    fmeContentLog("suggestReply:no_composer", {
+      strictTextbox: document.querySelectorAll('[contenteditable="true"][role="textbox"]').length,
+      contentEditable: document.querySelectorAll('[contenteditable="true"]').length,
+      afterHeuristic: candidates.length,
+    });
     throw new Error("composer_not_found");
   }
 
@@ -72,11 +79,11 @@ export function suggestReply(text: string): void {
     "margin:0",
     "padding:0",
     "border:0",
-    "z-index:2147483646",
+    "z-index:2147483647",
     "pointer-events:none",
     "display:block",
     "box-sizing:border-box",
-    "overflow:hidden",
+    "overflow:visible",
   ].join(";");
 
   const shadow = host.attachShadow({ mode: "open" });
@@ -84,6 +91,7 @@ export function suggestReply(text: string): void {
   const style = document.createElement("style");
   style.textContent = `
     :host {
+      display: block;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
     .ghost {

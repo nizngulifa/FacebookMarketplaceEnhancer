@@ -133,7 +133,9 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
 }
 
 export async function runSelfTestSuggestReply(d: SelfTestDeps): Promise<void> {
-  d.appendDebugLog("Step 4 Suggest: button clicked (runSuggestReplyOnTab → ghost text, main frame)");
+  d.appendDebugLog(
+    "Step 4 Suggest: button clicked (runSuggestReplyOnTab; trace lines below are for debugging)",
+  );
   const resolved = await d.getMessengerTab();
   if ("error" in resolved) {
     d.appendDebugLog(`Step 4 Suggest: tab error — ${resolved.error}`);
@@ -146,7 +148,12 @@ export async function runSelfTestSuggestReply(d: SelfTestDeps): Promise<void> {
 
   try {
     const result = await runSuggestReplyOnTab(resolved.tabId, text);
-    d.appendDebugLog(`Step 4 Suggest: result JSON — ${JSON.stringify(result)}`);
+    d.appendDebugLog("Step 4 Suggest: ——— trace start ———");
+    for (const line of result.logs) {
+      d.appendDebugLog(`Step 4 Suggest | ${line}`);
+    }
+    d.appendDebugLog("Step 4 Suggest: ——— trace end ———");
+    d.appendDebugLog(`Step 4 Suggest: result JSON — ${JSON.stringify({ ok: result.ok, error: result.ok ? undefined : result.error })}`);
     if (!result.ok) {
       d.setStatus(`Suggest failed: ${result.error}`);
       return;

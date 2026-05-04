@@ -9,6 +9,7 @@ async function run() {
       content: "src/content/messenger.ts",
       background: "src/background/background.ts",
       fmePromptBridge: "src/content/fme-prompt-bridge.ts",
+      fmeComposerProbeBridge: "src/content/fme-composer-probe-bridge.ts",
     },
     bundle: true,
     outdir: "dist",
