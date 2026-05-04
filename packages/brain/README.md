@@ -47,6 +47,8 @@ make brain-serve
 - **`GET /health`** — no auth; quick check the process is up.
 - **`POST /v1/predict`** — JSON body same shape as the CLI input (`ChatInput`). Response is `SellerReplyPrediction` JSON (`reply`, `rationale`, `confidence`).
 
+After editing **`prompts.py`** or other modules the server imports, **restart `make brain-serve`** so `uvicorn` loads the new code (reloading Chrome or the extension does not). Details: [docs/brain.md](../../docs/brain.md#restarting-the-http-server-after-edits).
+
 Default bind: **127.0.0.1:8765** (override with `FME_BRAIN_HOST` / `FME_BRAIN_PORT` in the environment if you change `main()` usage).
 
 Implementation: [`src/fme_brain/server.py`](src/fme_brain/server.py). Env loading: [`src/fme_brain/env.py`](src/fme_brain/env.py) (`load_brain_dotenv()` — **never** put keys in the extension bundle).

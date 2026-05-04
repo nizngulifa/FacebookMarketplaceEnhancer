@@ -16,7 +16,7 @@ Guide for humans and Cursor agents working on the **LLM pipeline** that turns a 
 | Path | Responsibility |
 |------|----------------|
 | `src/fme_brain/models.py` | `ChatTurn`, `ChatInput`, `SellerReplyPrediction` — **change the JSON contract here first**, then prompts and parsing. |
-| `src/fme_brain/prompts.py` | System prompt, user transcript template, `format_transcript()`, test constants (e.g. mock pickup address). **Primary place for prompt iteration.** |
+| `src/fme_brain/prompts.py` | System prompt, user transcript template, `format_transcript()`, listing constants (e.g. pickup address). **Primary place for prompt iteration.** |
 | `src/fme_brain/predict.py` | `predict_seller_reply()` — OpenAI client, model id env default, wires prompt + parse + validate. |
 | `src/fme_brain/parse.py` | `extract_json_object()` — strips optional ` ```json ` fences; extend if models return noisy wrappers. |
 | `src/fme_brain/env.py` | `load_brain_dotenv()` — **repo root** `.env` then **`packages/brain/.env`** (override). Used by CLI and HTTP server. |
@@ -53,6 +53,14 @@ From repo root (after `make brain-install` or manual venv + `pip install -e ".[d
 - `make brain-serve` — starts the local HTTP API (`uvicorn fme_brain.server:app`) on **127.0.0.1:8765** by default.
 - `cd packages/brain && PYTHONPATH=src .venv/bin/fme-brain fixtures/example_marketplace.json`
 - `pytest` — from `packages/brain`; `pyproject.toml` sets `pythonpath = ["src"]` for the same reason as `make brain-predict`.
+
+### Restarting the HTTP server after edits
+
+The **`make brain-serve` process keeps Python modules in memory**. If you change anything the server imports—especially **`prompts.py`**, but also `predict.py`, `models.py`, `server.py`, etc.—**stop and start the server** so the next `POST /v1/predict` uses the new code. (There is no hot-reload hook today—always restart the process.)
+
+- **Reloading the Chrome extension or Messenger does not restart Python.** Only the long-running `uvicorn` process matters for the extension MVP.
+- **Human live-testing:** If a tester is checking prompt or listing-fact changes in the real thread, **restart `make brain-serve` after your edit** (and tell them to hard-reload the Messenger tab if they had a stale error state). Otherwise they will still see the previous system prompt, old constants, or old model defaults.
+- **CLI vs server:** `fme-brain` and `make brain-predict` start a **fresh** process each time, so they always pick up file changes without a “server restart.”
 
 ## Extending the pipeline
 
@@ -100,6 +108,7 @@ On each full **Messenger tab load**, `apps/extension/src/content/messenger.ts` s
 | `OpenAIError` / missing API key | `.env` not saved, wrong path, or a code path that skips `load_brain_dotenv()` (CLI and server load it). |
 | `ModuleNotFoundError: fme_brain` | Editable install missing, or Python **ignoring `*.pth` files whose names start with `_`**. **Fix:** `make brain-predict` / `make brain-serve` (set `PYTHONPATH=src`), or `pytest` (uses `pythonpath` in `pyproject.toml`), or `PYTHONPATH=packages/brain/src` when invoking tools manually. |
 | Extension `brainSuggest:predict failed` | Brain server not running, wrong host/port, or HTTP error from `/v1/predict`. Run `make brain-serve`, set `OPENAI_API_KEY`, check `http://127.0.0.1:8765/health`. |
+| **Old behavior after editing `prompts.py`** (e.g. wrong address, previous tone) | The **`make brain-serve` process** was not restarted. **Stop and start** the server; reloading Chrome or the extension does not reload Python. |
 | Validation error on model output | Prompt/schema drift; tighten prompt or relax `SellerReplyPrediction` / parsing. |
 | Typer “unexpected argument” | The CLI is a **single** command: `fme-brain <path>` or `fme-brain -`, not `fme-brain predict …`. |
 

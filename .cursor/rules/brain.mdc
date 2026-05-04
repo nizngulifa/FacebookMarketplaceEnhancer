@@ -11,5 +11,6 @@ alwaysApply: false
 - **Iterate prompts** in `src/fme_brain/prompts.py`; **contract** in `models.py`; **API call** in `predict.py`.
 - **CLI:** `fme-brain <file.json>` or `fme-brain -` (stdin) after `pip install -e ".[dev,server]"` in a venv; **`make brain-predict`** / **`make brain-serve`** set `PYTHONPATH=src` (editable `.pth` quirks on Python 3.11+).
 - **HTTP:** `src/fme_brain/server.py` — `GET /health`, `POST /v1/predict`; **`make brain-serve`** from repo root. Extension calls localhost only; keys stay in `.env` loaded via **`fme_brain.env.load_brain_dotenv()`**.
+- **Restart server after Python edits** (especially **`prompts.py`**): `uvicorn` keeps imported modules in memory—**stop and start `make brain-serve`** before live Messenger testing; extension reload is not enough. See [docs/brain.md](../../docs/brain.md) (*Restarting the HTTP server after edits*).
 - **Tests:** `pytest` in `packages/brain` (parsing tests are offline). After substantive changes, run a live fixture smoke test if the maintainer has API access.
 - Keep **`predict_seller_reply`** stable as the core entry; the HTTP layer wraps it.
