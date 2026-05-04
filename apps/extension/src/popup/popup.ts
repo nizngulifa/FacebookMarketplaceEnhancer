@@ -1,26 +1,26 @@
 import type { ThreadSnapshot } from "../lib/messenger-extract";
 import { FME_GET_THREAD_SNAPSHOT } from "../lib/messenger-protocol";
+import { getMessengerTab, messengerThreadIdFromUrl } from "./messenger-tab";
+import {
+  runSelfTestMarker,
+  runSelfTestPing,
+  runSelfTestPrompt,
+} from "./write-path-selftest";
 import { setStatus } from "../lib/status";
 
-function messengerThreadIdFromUrl(url: string): string | undefined {
-  try {
-    const u = new URL(url);
-    if (!u.hostname.endsWith("messenger.com")) return undefined;
-    const m = u.pathname.match(/\/t\/([^/]+)/);
-    return m?.[1];
-  } catch {
-    return undefined;
-  }
+function appendDebugLog(line: string): void {
+  const el = document.getElementById("debug-log");
+  if (!el) return;
+  const stamp = new Date().toISOString();
+  el.textContent += `[${stamp}] ${line}\n`;
+  el.scrollTop = el.scrollHeight;
+  console.info(`[FME popup] ${line}`);
 }
 
-function isMessengerUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    const u = new URL(url);
-    return u.hostname === "messenger.com" || u.hostname.endsWith(".messenger.com");
-  } catch {
-    return false;
-  }
+function clearDebugLog(): void {
+  const el = document.getElementById("debug-log");
+  if (!el) return;
+  el.textContent = "";
 }
 
 function setMeta(text: string, visible: boolean): void {
@@ -50,27 +50,20 @@ function renderMessages(snapshot: ThreadSnapshot): void {
 }
 
 async function loadSnapshot(): Promise<void> {
-  // Popups are not in the browser tab strip; `currentWindow` often targets the wrong window.
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  const url = tab?.url;
-
-  if (!isMessengerUrl(url)) {
-    setStatus("Active tab is not messenger.com. Open a thread, then try again.");
+  const resolved = await getMessengerTab();
+  if ("error" in resolved) {
+    setStatus(resolved.error);
     setMeta("", false);
     renderMessages({ logFound: false, messages: [] });
     return;
   }
 
-  if (tab.id == null) {
-    setStatus("Could not read the active tab.");
-    return;
-  }
-
+  const { tabId, url } = resolved;
   setStatus("Reading DOM…");
 
-  let snapshot: ThreadSnapshot;
+  let snapshot: ThreadSnapshot | undefined;
   try {
-    snapshot = await chrome.tabs.sendMessage(tab.id, { type: FME_GET_THREAD_SNAPSHOT });
+    snapshot = await chrome.tabs.sendMessage(tabId, { type: FME_GET_THREAD_SNAPSHOT });
   } catch {
     setStatus(
       "Could not reach the page script. Reload the Messenger tab, then tap Reload messages again.",
@@ -80,7 +73,16 @@ async function loadSnapshot(): Promise<void> {
     return;
   }
 
-  const tid = messengerThreadIdFromUrl(url ?? "");
+  if (snapshot == null) {
+    setStatus(
+      "Reload messages returned no data (same channel issue as self-test had). Reload Messenger; thread read still uses messaging until migrated.",
+    );
+    setMeta("", false);
+    renderMessages({ logFound: false, messages: [] });
+    return;
+  }
+
+  const tid = messengerThreadIdFromUrl(url);
   const titleLine = snapshot.title ? `Title: ${snapshot.title}` : "Title: (not found)";
   const idLine = tid ? `Thread id: ${tid}` : "";
   setMeta([titleLine, idLine].filter(Boolean).join("\n"), true);
@@ -95,11 +97,32 @@ async function loadSnapshot(): Promise<void> {
   renderMessages(snapshot);
 }
 
+const selfTestDeps = {
+  getMessengerTab,
+  appendDebugLog,
+  setStatus,
+};
+
 function main(): void {
-  const btn = document.getElementById("refresh");
-  btn?.addEventListener("click", () => {
+  document.getElementById("refresh")?.addEventListener("click", () => {
     void loadSnapshot();
   });
+
+  document.getElementById("st-ping")?.addEventListener("click", () => {
+    void runSelfTestPing(selfTestDeps);
+  });
+  document.getElementById("st-marker")?.addEventListener("click", () => {
+    void runSelfTestMarker(selfTestDeps);
+  });
+  document.getElementById("st-prompt")?.addEventListener("click", () => {
+    void runSelfTestPrompt(selfTestDeps);
+  });
+  document.getElementById("st-clear")?.addEventListener("click", () => {
+    clearDebugLog();
+    appendDebugLog("Log cleared.");
+  });
+
+  appendDebugLog("Popup opened — self-test ready.");
   void loadSnapshot();
 }
 
