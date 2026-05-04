@@ -1,7 +1,7 @@
 import { runPromptUserOnTab, runSuggestReplyOnTab } from "../lib/prompt-via-scripting";
 import { getMessengerTab } from "./messenger-tab";
 
-/** Must match `FME_DEBUG_MARKER_ID` in `src/lib/marketplace-ui.ts` (injected `func` cannot close over imports). */
+/** Must match `FME_DEBUG_MARKER_ID` in `src/lib/fme-ui-host-ids.ts` (injected `func` cannot close over imports). */
 const INJECTED_MARKER_ID = "fme-debug-marker";
 
 export type SelfTestDeps = {

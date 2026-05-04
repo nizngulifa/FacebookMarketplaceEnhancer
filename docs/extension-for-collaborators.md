@@ -21,12 +21,13 @@ Use this doc to **ship changes to `apps/extension/`** or to **hook the extension
 
 | Layer | Role |
 |-------|------|
-| **`src/lib/marketplace-ui.ts`** | **`MarketplaceUI` write path** — `promptUser(message)` (dark assistant chip, scroll-safe, no full-page overlay), `injectDebugMarker()` for dev checks. **All Messenger DOM writes for copilot UX should stay here.** |
-| **`src/lib/prompt-via-scripting.ts`** | **`runPromptUserOnTab(tabId, message)`** — injects `dist/fmePromptBridge.js` then calls `promptUser` via `chrome.scripting.executeScript`. Use this whenever you need a **reliable** return value from the popup or service worker. |
-| **`src/content/fme-prompt-bridge.ts`** | Built to **`dist/fmePromptBridge.js`**. Assigns `globalThis.__fmePromptUser = promptUser` in the page’s **extension isolated world** (same world as content scripts). |
-| **`src/background/background.ts`** | **Service worker** — wakes on events; handles **`FME_BACKGROUND_SHOW_PROMPT`** and runs `runPromptUserOnTab`. |
-| **`src/content/messenger.ts`** | Content script: **`FME_GET_THREAD_SNAPSHOT`**, **`FME_PROMPT_USER`** (deferred `sendResponse`). Popup “Reload messages” still uses `sendMessage` for snapshot; **responses to the caller can be `undefined`** on some Chrome + Messenger setups — prefer **`runPromptUserOnTab`** for prompts from extension UI. |
-| **`src/popup/write-path-selftest.ts`** | Dev **Write path** self-test (Ping / Marker / Prompt). |
+| **`src/lib/marketplace-ui.ts`** | **`MarketplaceUI` write path** — `promptUser(message)` (dark assistant chip), `suggestReply(text)` (composer ghost text, Tab to insert), `injectDebugMarker()` for dev checks. **All Messenger DOM writes for copilot UX should stay here.** |
+| **`src/lib/prompt-via-scripting.ts`** | **`runPromptUserOnTab`**, **`runSuggestReplyOnTab`** — injects `dist/fmePromptBridge.js` (and for suggest, probes with `dist/fmeComposerProbeBridge.js` then targets `frameId`) then calls the UI helper via `chrome.scripting.executeScript`. Use this when you need a **reliable** return value from the popup or service worker. |
+| **`src/content/fme-prompt-bridge.ts`** | Built to **`dist/fmePromptBridge.js`**. Assigns `globalThis.__fmePromptUser` / `__fmeSuggestReply` in the page’s **extension isolated world**. |
+| **`src/content/fme-composer-probe-bridge.ts`** | Built to **`dist/fmeComposerProbeBridge.js`**. Assigns `globalThis.__fmeProbeComposer` for all-frame composer discovery before `suggestReply`. |
+| **`src/background/background.ts`** | **Service worker** — handles **`FME_BACKGROUND_SHOW_PROMPT`** and **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`**. |
+| **`src/content/messenger.ts`** | Content script: **`FME_GET_THREAD_SNAPSHOT`**, **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`** (deferred `sendResponse`). Popup “Reload messages” still uses `sendMessage` for snapshot; **responses to the caller can be `undefined`** on some Chrome + Messenger setups — prefer the **scripting** helpers from extension UI. |
+| **`src/popup/write-path-selftest.ts`** | Dev **Write path** self-test (Ping / Marker / Prompt / Suggest + trace log for suggest). |
 
 ---
 
@@ -59,6 +60,21 @@ await runPromptUserOnTab(tabId, "Your instruction text here.");
 
 `chrome.tabs.sendMessage(tabId, { type: FME_PROMPT_USER, message: "…" })` — **UI still runs**; **do not rely** on the reply payload for critical control flow.
 
+### D. Ghost reply suggestion from popup / worker
+
+**Preferred:** message the service worker:
+
+```ts
+const result = await chrome.runtime.sendMessage({
+  type: "FME_BACKGROUND_SHOW_SUGGEST_REPLY", // in messenger-protocol.ts
+  text: "Suggested reply text here.",
+  // tabId: optional; if omitted, worker picks focused messenger.com tab
+});
+// result: { ok: true, logs: string[] } | { ok: false, error: string, logs?: string[] }
+```
+
+Or call **`runSuggestReplyOnTab(tabId, text)`** from code that already holds `tabId`.
+
 ---
 
 ## 4. “External world” — **not implemented** (your next feature)
@@ -83,22 +99,25 @@ Nothing in this repo yet lets **arbitrary internet callers** or **your REST API*
 |----------|-----------|---------|
 | `FME_GET_THREAD_SNAPSHOT` | → content script | Thread DOM snapshot for popup “Reload messages”. |
 | `FME_PROMPT_USER` | → content script | Call `promptUser` in-page (deferred reply). |
+| `FME_SUGGEST_REPLY` | → content script | Call `suggestReply` in-page (deferred reply). |
 | `FME_BACKGROUND_SHOW_PROMPT` | → service worker | Run `runPromptUserOnTab` (scripting path). |
+| `FME_BACKGROUND_SHOW_SUGGEST_REPLY` | → service worker | Run `runSuggestReplyOnTab` (scripting path). |
 
 ---
 
 ## 6. Manifest and bundles
 
 - **`manifest.json`** — `permissions`, `host_permissions`, `background.service_worker`, `content_scripts`, `action` popup.
-- **`esbuild.config.js`** — `entryPoints`: `popup`, `content`, `background`, `fmePromptBridge`. New entry = add here + reference from manifest/HTML if needed.
+- **`esbuild.config.js`** — `entryPoints`: `popup`, `content`, `background`, `fmePromptBridge`, `fmeComposerProbeBridge`. New entry = add here + reference from manifest/HTML if needed.
 
 ---
 
 ## 7. Verification checklist (before you PR)
 
 - [ ] `make extension-build` and `npm run typecheck:extension` pass.
-- [ ] Self-test **1 → 2 → 3** on a real Messenger tab (extension popup).
+- [ ] Self-test **1 → 2 → 3 → 4** on a real Messenger tab (extension popup).
 - [ ] If you changed `promptUser` visuals: confirm scroll + dismiss (**Got it** / Escape).
+- [ ] If you changed `suggestReply`: confirm ghost visibility, **Tab** inserts, **Escape** dismisses, typing clears.
 
 ---
 

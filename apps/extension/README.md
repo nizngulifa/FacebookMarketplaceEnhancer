@@ -57,21 +57,25 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `src/popup/messenger-tab.ts` | Resolve the active `messenger.com` tab from the popup |
 | `src/popup/write-path-selftest.ts` | Dev-only “Write path” steps (scripting API) |
 | `src/lib/`           | Shared helpers                                 |
-| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (dark assistant chip), debug marker |
-| `src/lib/prompt-via-scripting.ts` | `runPromptUserOnTab` — inject bridge + call `promptUser` via `scripting` |
-| `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` → `runPromptUserOnTab` |
-| `src/content/fme-prompt-bridge.ts` | On-demand bundle: assigns `globalThis.__fmePromptUser` for `scripting` |
+| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (dark assistant chip), `suggestReply` (composer ghost text), debug marker |
+| `src/lib/messenger-composer.ts` | Composer discovery for `suggestReply` (strict + loose `contenteditable` heuristics) |
+| `src/lib/fme-ui-host-ids.ts` | Stable DOM ids for injected UI hosts (shared with scripting verify) |
+| `src/lib/prompt-via-scripting.ts` | `runPromptUserOnTab`, `runSuggestReplyOnTab` — inject bridge(s) + call via `scripting` |
+| `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` / `FME_BACKGROUND_SHOW_SUGGEST_REPLY` |
+| `src/content/fme-prompt-bridge.ts` | On-demand bundle: `__fmePromptUser`, `__fmeSuggestReply` for `scripting` |
+| `src/content/fme-composer-probe-bridge.ts` | On-demand bundle: `__fmeProbeComposer` (all-frames composer probe) |
 | `dist/`              | Build output (gitignored; run build first)       |
 | `popup.html`         | Popup markup; references `dist/popup.js`       |
 | `popup.css`          | Popup styles                                   |
 | `esbuild.config.js`  | Bundler config; add entry points as needed     |
 | `.env.example`       | Placeholder for future extension env vars      |
 
-## MarketplaceUI write path (`promptUser`)
+## MarketplaceUI write path (`promptUser`, `suggestReply`)
 
 All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketplace-ui.ts`** so we do not scatter `document.createElement` across the codebase.
 
 - **`promptUser(message)`** — dismissible **dark assistant chip** on the **inline-end** edge (usually right in LTR): reads as an internal copilot voice, not a tutorial card. No full-page dimmer — the user can **keep scrolling** the thread. **Got it** or **Escape** closes it.
+- **`suggestReply(text)`** — **Ghost suggestion** over the thread composer: muted overlay + **Tab** inserts the text into the field (user still sends the message), **Escape** dismisses without inserting. Typing in the composer clears the ghost.
 - **Debug marker** — `injectDebugMarker()` / `#fme-debug-marker` for manual verification only.
 
 ### Who can call `promptUser`?
@@ -83,12 +87,20 @@ All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketp
 | **Content script** (e.g. message from another extension context) | **Yes** | `chrome.tabs.sendMessage` with **`FME_PROMPT_USER`** still calls `promptUser` in-page (deferred `sendResponse`); on some setups the **response payload** back to the caller may be unreliable—use the **background** path above if you need a confirmed return value. |
 | **Trusted web app** | **Not wired** | Possible follow-up: `externally_connectable` + `chrome.runtime.sendMessage` from an allow-listed origin, or a **WebSocket / fetch loop** in the service worker that listens to your server then calls `runPromptUserOnTab`. |
 
+### Who can call `suggestReply`?
+
+| Caller | Supported today? | How |
+|--------|------------------|-----|
+| **Same extension (popup, service worker, future orchestrator)** | **Yes** | Prefer `chrome.runtime.sendMessage` with **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** `{ text, tabId? }`. The worker runs **`runSuggestReplyOnTab`** (composer probe + `fmePromptBridge.js` into the chosen frame). |
+| **Content script** | **Yes** | `chrome.tabs.sendMessage` with **`FME_SUGGEST_REPLY`** `{ text }` (same caveats as `FME_PROMPT_USER` about flaky `sendResponse`). |
+
 ### How the popup self-test works (important for contributors)
 
 On some Chrome + `messenger.com` setups, **`chrome.tabs.sendMessage` + `sendResponse` from a content script returns `undefined`** to the caller even when the listener runs. The popup’s **Write path (self-test)** therefore uses **`chrome.scripting.executeScript`** instead:
 
 1. **Ping / marker** — `executeScript` with `allFrames: true` so code runs in the same document the user sees (Messenger often has a single meaningful frame in practice; `allFrames` is still the right default for diagnostics).
 2. **Prompt** — uses **`runPromptUserOnTab`** (bridge file + `func`), same as the service worker.
+3. **Suggest** — uses **`runSuggestReplyOnTab`** (injects `fmeComposerProbeBridge.js` all-frames to pick `frameId`, then `fmePromptBridge.js` + `suggestReply`). The popup log prints a **trace** (probe rows, verify rect) for debugging.
 
 After changing permissions, **reload the extension** on `chrome://extensions` so Chrome grants them (e.g. `scripting`).
 
@@ -96,7 +108,7 @@ After changing permissions, **reload the extension** on `chrome://extensions` so
 
 ### Protocol constants
 
-See `src/lib/messenger-protocol.ts`: **`FME_PROMPT_USER`** (content script), **`FME_BACKGROUND_SHOW_PROMPT`** (service worker → `scripting`).
+See `src/lib/messenger-protocol.ts`: **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`** (content script), **`FME_BACKGROUND_SHOW_PROMPT`**, **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** (service worker → `scripting`).
 
 ## Adding features (for future work)
 

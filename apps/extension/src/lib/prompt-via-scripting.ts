@@ -4,6 +4,7 @@
  */
 
 import type { ComposerFrameProbe } from "./messenger-composer";
+import { FME_SUGGEST_HOST_ID } from "./fme-ui-host-ids";
 
 export const PROMPT_BRIDGE_FILE = "dist/fmePromptBridge.js";
 /** Tiny bridge injected into all frames to locate the thread composer (often inside an iframe). */
@@ -193,8 +194,9 @@ export async function runSuggestReplyOnTab(tabId: number, text: string): Promise
     logs.push("verify: post-run snapshot in target frame");
     const verify = await chrome.scripting.executeScript({
       target: { tabId, frameIds: [resolved.frameId] },
-      func: () => {
-        const host = document.getElementById("fme-marketplace-ui-suggest-host");
+      args: [FME_SUGGEST_HOST_ID],
+      func: (suggestHostId: string) => {
+        const host = document.getElementById(suggestHostId);
         const r = host?.getBoundingClientRect();
         const strict = document.querySelectorAll('[contenteditable="true"][role="textbox"]').length;
         const ce = document.querySelectorAll('[contenteditable="true"]').length;

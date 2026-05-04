@@ -1,9 +1,12 @@
 import { fmeContentLog } from "./fme-content-log";
+import {
+  FME_DEBUG_MARKER_ID,
+  FME_PROMPT_HOST_ID,
+  FME_SUGGEST_HOST_ID,
+} from "./fme-ui-host-ids";
 import { listMessengerComposerCandidates, pickMessengerComposerElement } from "./messenger-composer";
 
-export const FME_PROMPT_HOST_ID = "fme-marketplace-ui-prompt-host";
-export const FME_SUGGEST_HOST_ID = "fme-marketplace-ui-suggest-host";
-export const FME_DEBUG_MARKER_ID = "fme-debug-marker";
+export { FME_DEBUG_MARKER_ID, FME_PROMPT_HOST_ID, FME_SUGGEST_HOST_ID };
 
 function removeExistingPromptHost(): void {
   document.getElementById(FME_PROMPT_HOST_ID)?.remove();
