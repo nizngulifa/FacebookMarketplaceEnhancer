@@ -13,6 +13,11 @@ export const FME_SUGGEST_REPLY = "FME_SUGGEST_REPLY" as const;
  * `chrome.scripting` + `suggestReply` on a Messenger tab.
  */
 export const FME_BACKGROUND_SHOW_SUGGEST_REPLY = "FME_BACKGROUND_SHOW_SUGGEST_REPLY" as const;
+/**
+ * Content script → service worker: POST mapped turns to the local brain server; response is
+ * `reply` text for `FME_BACKGROUND_SHOW_SUGGEST_REPLY` (content script usually follows with that).
+ */
+export const FME_BACKGROUND_BRAIN_PREDICT = "FME_BACKGROUND_BRAIN_PREDICT" as const;
 
 export type GetThreadSnapshotMessage = { type: typeof FME_GET_THREAD_SNAPSHOT };
 export type PromptUserMessage = { type: typeof FME_PROMPT_USER; message: string };
@@ -27,4 +32,10 @@ export type BackgroundShowSuggestReplyMessage = {
   type: typeof FME_BACKGROUND_SHOW_SUGGEST_REPLY;
   text: string;
   tabId?: number;
+};
+/** Serializable turns for `ChatInput` / POST `/v1/predict`. */
+export type BrainChatTurnPayload = { role: "buyer" | "seller"; text: string };
+export type BackgroundBrainPredictMessage = {
+  type: typeof FME_BACKGROUND_BRAIN_PREDICT;
+  messages: BrainChatTurnPayload[];
 };

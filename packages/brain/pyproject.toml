@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "fme-brain"
@@ -17,12 +17,19 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+server = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+]
 
 [project.scripts]
 fme-brain = "fme_brain.cli:app"
+fme-brain-serve = "fme_brain.server:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/fme_brain"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Editable .pth hooks starting with "_" are ignored on Python 3.11+; ensure `src` is on path.
+pythonpath = ["src"]

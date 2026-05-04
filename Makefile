@@ -1,6 +1,6 @@
 # Canonical tasks for humans and agents. Run from repo root.
 
-.PHONY: help db-up db-down db-ps db-seed extension-install extension-build extension-watch compose-check brain-install brain-predict
+.PHONY: help db-up db-down db-ps db-seed extension-install extension-build extension-watch compose-check brain-install brain-predict brain-serve
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  compose-check    Validate docker-compose.yml"
 	@echo "  brain-install    Python venv + editable install for packages/brain"
 	@echo "  brain-predict    Run seller reply CLI (default: packages/brain fixture)"
+	@echo "  brain-serve      Local HTTP API for the extension (127.0.0.1:8765)"
 
 db-up:
 	docker compose up -d
@@ -40,9 +41,13 @@ compose-check:
 	docker compose config
 
 brain-install:
-	cd packages/brain && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+	cd packages/brain && python3 -m venv .venv && .venv/bin/pip install -e ".[dev,server]"
 
 FILE ?= fixtures/example_marketplace.json
 
+# PYTHONPATH: editable-install .pth files named with leading "_" are ignored on Python 3.11+.
 brain-predict:
-	cd packages/brain && .venv/bin/fme-brain "$(FILE)"
+	cd packages/brain && PYTHONPATH=src .venv/bin/fme-brain "$(FILE)"
+
+brain-serve:
+	cd packages/brain && PYTHONPATH=src .venv/bin/python -m uvicorn fme_brain.server:app --host 127.0.0.1 --port 8765
