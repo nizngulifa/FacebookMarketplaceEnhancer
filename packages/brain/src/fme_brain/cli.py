@@ -6,15 +6,11 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from dotenv import load_dotenv
 
+from fme_brain.env import load_brain_dotenv
 from fme_brain.models import ChatInput
 
-# Resolve .env relative to this package (not process cwd) so Make/IDE runs still find the key.
-_BRAIN_PKG_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = _BRAIN_PKG_ROOT.parent.parent
-load_dotenv(_REPO_ROOT / ".env")
-load_dotenv(_BRAIN_PKG_ROOT / ".env", override=True)
+load_brain_dotenv()
 
 from fme_brain.predict import predict_seller_reply
 

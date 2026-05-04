@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
-from dotenv import load_dotenv
+from fme_brain.env import load_brain_dotenv
 
-_BRAIN_PKG_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = _BRAIN_PKG_ROOT.parent.parent
-load_dotenv(_REPO_ROOT / ".env")
-load_dotenv(_BRAIN_PKG_ROOT / ".env", override=True)
+load_brain_dotenv()
 
-from fastapi import FastAPI, HTTPException  # noqa: E402 — after dotenv
-from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-from fme_brain.models import ChatInput, SellerReplyPrediction  # noqa: E402
-from fme_brain.predict import predict_seller_reply  # noqa: E402
+from fme_brain.models import ChatInput, SellerReplyPrediction
+from fme_brain.predict import predict_seller_reply
 
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8765

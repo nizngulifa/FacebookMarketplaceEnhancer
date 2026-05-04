@@ -1,6 +1,6 @@
 # Sales “brain” (`packages/brain`)
 
-Guide for humans and Cursor agents working on the **LLM pipeline** that turns a short sales chat into a **suggested next seller message**. This package is **deliberately separate** from the Chrome extension: same repo, no shared imports today.
+Guide for humans and Cursor agents working on the **LLM pipeline** that turns a short sales chat into a **suggested next seller message**. The **Python package** has no dependency on the Chrome extension, but the **MVP integration** calls a small local HTTP server from the extension’s service worker (see [Chrome extension + brain](#chrome-extension--brain-mvp)).
 
 ## What it does
 
@@ -9,7 +9,7 @@ Guide for humans and Cursor agents working on the **LLM pipeline** that turns a 
 3. **Model:** OpenAI Chat Completions with `response_format: json_object`.
 4. **Output:** `SellerReplyPrediction` — `reply` (required), `rationale`, `confidence` — validated by Pydantic after parsing.
 
-There is **no HTTP server** in this package; callers can use the Python API or the CLI.
+**Callers today:** the **Python API** (`predict_seller_reply`), the **CLI** (`fme-brain`), and an optional **local HTTP server** (`make brain-serve`) used by the extension. The server is a thin wrapper around `predict_seller_reply`; it does not add business logic.
 
 ## Layout (where to edit what)
 
@@ -19,7 +19,9 @@ There is **no HTTP server** in this package; callers can use the Python API or t
 | `src/fme_brain/prompts.py` | System prompt, user transcript template, `format_transcript()`, test constants (e.g. mock pickup address). **Primary place for prompt iteration.** |
 | `src/fme_brain/predict.py` | `predict_seller_reply()` — OpenAI client, model id env default, wires prompt + parse + validate. |
 | `src/fme_brain/parse.py` | `extract_json_object()` — strips optional ` ```json ` fences; extend if models return noisy wrappers. |
-| `src/fme_brain/cli.py` | Typer CLI; loads `.env` from **repo root** then **`packages/brain/.env`** (override). |
+| `src/fme_brain/env.py` | `load_brain_dotenv()` — **repo root** `.env` then **`packages/brain/.env`** (override). Used by CLI and HTTP server. |
+| `src/fme_brain/cli.py` | Typer CLI; calls `load_brain_dotenv()` before `predict_seller_reply`. |
+| `src/fme_brain/server.py` | Local **FastAPI** app: `GET /health`, `POST /v1/predict` (body = `ChatInput` JSON). **OpenAI key only on the server process**, not in the extension. |
 | `fixtures/*.json` | Example `ChatInput` JSON for manual runs and regression stories. |
 | `tests/` | Unit tests (no live API by default). |
 
@@ -39,16 +41,18 @@ flowchart LR
 
 - **`OPENAI_API_KEY`** — required for live calls.
 - **`OPENAI_MODEL`** — optional; default is `gpt-4o` in `predict.py`.
-- **`.env`:** Ignored by git. The CLI loads `$REPO_ROOT/.env` then `packages/brain/.env` (second wins on duplicate keys). Prefer `packages/brain/.env` for brain-only keys.
-- **Never** put API keys in the extension, committed JSON, or `db/` seeds.
+- **`.env`:** Ignored by git. `load_brain_dotenv()` loads `$REPO_ROOT/.env` then `packages/brain/.env` (second wins on duplicate keys). Prefer `packages/brain/.env` for brain-only keys.
+- **Never** put API keys in the extension bundle, committed JSON, or `db/` seeds. The extension talks to **localhost** only; the key stays in the Python process.
+- **Optional (server bind):** `FME_BRAIN_HOST` (default `127.0.0.1`), `FME_BRAIN_PORT` (default `8765`) — read in `server.py`’s `main()` when you run `uvicorn` via `make brain-serve`. The extension default origin is `http://127.0.0.1:8765` (see `apps/extension/src/lib/brain-config.ts`).
 
 ## Commands
 
-From repo root (after `make brain-install` or manual venv + `pip install -e ".[dev]"` in `packages/brain`):
+From repo root (after `make brain-install` or manual venv + `pip install -e ".[dev,server]"` in `packages/brain`):
 
-- `make brain-predict` — runs the default fixture (`FILE=fixtures/...` relative to `packages/brain`).
-- `cd packages/brain && fme-brain fixtures/example_marketplace.json`
-- `pytest` — from `packages/brain` with dev extras installed.
+- `make brain-predict` — runs the default fixture (`FILE=fixtures/...` relative to `packages/brain`). Sets `PYTHONPATH=src` so imports work regardless of editable-install quirks (see [Troubleshooting](#troubleshooting)).
+- `make brain-serve` — starts the local HTTP API (`uvicorn fme_brain.server:app`) on **127.0.0.1:8765** by default.
+- `cd packages/brain && PYTHONPATH=src .venv/bin/fme-brain fixtures/example_marketplace.json`
+- `pytest` — from `packages/brain`; `pyproject.toml` sets `pythonpath = ["src"]` for the same reason as `make brain-predict`.
 
 ## Extending the pipeline
 
@@ -62,7 +66,7 @@ From repo root (after `make brain-install` or manual venv + `pip install -e ".[d
 
 1. Extend `ChatInput` (or add a sibling model) in `models.py`.
 2. Pass new data into the user message in `prompts.py` (`USER_TRANSCRIPT_TEMPLATE` or a new template).
-3. Update `cli.py` to read the same JSON shape; document in `packages/brain/README.md`.
+3. Update `cli.py` to read the same JSON shape; keep **`POST /v1/predict`** in `server.py` aligned (same `ChatInput` body). Document in `packages/brain/README.md`.
 
 ### Swap or multi-provider models
 
@@ -78,17 +82,24 @@ If `json_object` is insufficient, consider OpenAI **structured outputs** / **JSO
 - **Live smoke tests** — run the CLI with a fixture when changing prompts or model defaults; requires `OPENAI_API_KEY`.
 - Avoid committing integration tests that call OpenAI in CI unless you use a mock or a dedicated secret.
 
-## Relationship to the extension
+## Chrome extension + brain (MVP)
 
-- The extension extracts Messenger threads in `apps/extension/`; it does **not** import `fme_brain`.
-- A future integration will likely: serialize turns to `ChatInput` JSON (or call a backend that does), then display `SellerReplyPrediction.reply`. Mapping **display names → buyer/seller** happens at the integration layer, not inside the brain.
+End-to-end flow:
+
+1. **Read:** `extractThreadSnapshot` in `apps/extension/src/lib/messenger-extract.ts` builds a list of row texts + sender labels from the Messenger DOM.
+2. **Map:** `threadSnapshotToBrainMessages` (`thread-to-brain-messages.ts`) maps each row to `buyer` or `seller`. **English UI:** the logged-in user appears as **You** → treated as **seller**; all other senders → **buyer**. (Product rules for other locales belong in that module.)
+3. **Predict:** The content script sends **`FME_BACKGROUND_BRAIN_PREDICT`** to the **service worker** with `{ messages }`. The worker **`fetch`es** `POST /v1/predict` on the local brain server (`brain-client.ts` + `brain-config.ts`). **No API key in the extension.**
+4. **Write:** On success, the content script calls **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** with `reply` text, with **retries** (`ghost-suggest-retry.ts`) until `runSuggestReplyOnTab` succeeds — the composer often lives in a subframe that hydrates late.
+
+On each full **Messenger tab load**, `apps/extension/src/content/messenger.ts` still schedules the assistant chip + brain-driven ghost suggestion (gate or remove before shipping to end users). See [apps/extension/README.md](../apps/extension/README.md).
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---------|----------------|
-| `OpenAIError` / missing API key | `.env` not saved, wrong path, or CLI run from a context that skips `cli.py` dotenv loading. |
-| `ModuleNotFoundError: fme_brain` | Editable install missing: `pip install -e ".[dev]"` inside `packages/brain` venv. |
+| `OpenAIError` / missing API key | `.env` not saved, wrong path, or a code path that skips `load_brain_dotenv()` (CLI and server load it). |
+| `ModuleNotFoundError: fme_brain` | Editable install missing, or Python **ignoring `*.pth` files whose names start with `_`**. **Fix:** `make brain-predict` / `make brain-serve` (set `PYTHONPATH=src`), or `pytest` (uses `pythonpath` in `pyproject.toml`), or `PYTHONPATH=packages/brain/src` when invoking tools manually. |
+| Extension `brainSuggest:predict failed` | Brain server not running, wrong host/port, or HTTP error from `/v1/predict`. Run `make brain-serve`, set `OPENAI_API_KEY`, check `http://127.0.0.1:8765/health`. |
 | Validation error on model output | Prompt/schema drift; tighten prompt or relax `SellerReplyPrediction` / parsing. |
 | Typer “unexpected argument” | The CLI is a **single** command: `fme-brain <path>` or `fme-brain -`, not `fme-brain predict …`. |
 

@@ -12,10 +12,12 @@ From repo root (or this directory):
 cd packages/brain
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,server]"
 ```
 
-Or from repo root: `make brain-install` (creates `packages/brain/.venv` and installs the package).
+Or from repo root: `make brain-install` (creates `packages/brain/.venv` and installs CLI + HTTP server extras).
+
+The **`Makefile` sets `PYTHONPATH=src`** for `brain-predict` and `brain-serve` because some Python versions ignore editable-install `.pth` hooks whose filenames start with `_`. Tests use `pythonpath = ["src"]` in `pyproject.toml` for the same reason.
 
 Set `OPENAI_API_KEY` in your environment, or copy `.env.example` to `.env` in this directory (the CLI loads repo root `.env` first, then `packages/brain/.env`). The OpenAI SDK also reads `OPENAI_API_KEY` from the environment.
 
@@ -33,6 +35,23 @@ make brain-predict
 # Custom file (path relative to packages/brain):
 make brain-predict FILE=fixtures/example_marketplace.json
 ```
+
+### Local HTTP API (Chrome extension MVP)
+
+Start the server (requires `OPENAI_API_KEY` for live `/v1/predict`):
+
+```bash
+make brain-serve
+```
+
+- **`GET /health`** — no auth; quick check the process is up.
+- **`POST /v1/predict`** — JSON body same shape as the CLI input (`ChatInput`). Response is `SellerReplyPrediction` JSON (`reply`, `rationale`, `confidence`).
+
+Default bind: **127.0.0.1:8765** (override with `FME_BRAIN_HOST` / `FME_BRAIN_PORT` in the environment if you change `main()` usage).
+
+Implementation: [`src/fme_brain/server.py`](src/fme_brain/server.py). Env loading: [`src/fme_brain/env.py`](src/fme_brain/env.py) (`load_brain_dotenv()` — **never** put keys in the extension bundle).
+
+See [docs/brain.md](../../docs/brain.md) for how `apps/extension/` calls this endpoint.
 
 **Note:** The CLI is invoked as `fme-brain <path>` or `fme-brain -`, not `fme-brain predict …`.
 
@@ -74,4 +93,4 @@ out = predict_seller_reply(
 print(out.reply, out.confidence)
 ```
 
-`load_dotenv` runs only in the CLI module. For library use in other scripts, set env vars yourself or call `dotenv.load_dotenv` before `predict_seller_reply`.
+`load_brain_dotenv()` runs in the CLI and HTTP server entrypoints. For one-off scripts that call `predict_seller_reply` directly, either set env vars yourself or call `load_brain_dotenv()` from `fme_brain.env` first.

@@ -8,6 +8,8 @@ import {
   FME_PROMPT_USER,
   FME_SUGGEST_REPLY,
 } from "../lib/messenger-protocol";
+import type { BrainPredictResult } from "../lib/brain-client";
+import { retryGhostSuggestViaBackground } from "../lib/ghost-suggest-retry";
 import { promptUser, suggestReply } from "../lib/marketplace-ui";
 import { threadSnapshotToBrainMessages } from "../lib/thread-to-brain-messages";
 
@@ -28,8 +30,6 @@ const DEV_SUGGEST_RETRY_MS = 350;
 const DEV_PROMPT_DELAY_MS = 200;
 /** After hydration, Meta often replaces the composer; `suggestReply` now rebinds — this is just a gentler first try. */
 const DEV_SUGGEST_FIRST_DELAY_MS = 1200;
-
-type BgSuggestResult = { ok?: boolean; error?: string };
 
 /**
  * After load: assistant chip + ghost suggestion from local brain server (`make brain-serve`).
@@ -78,43 +78,21 @@ async function runBrainGhostSuggestionOnLoad(): Promise<void> {
     return;
   }
 
-  const p = pred as { ok?: boolean; reply?: string; error?: string };
-  if (p?.ok !== true || typeof p.reply !== "string") {
-    fmeContentLog("brainSuggest:predict failed", { error: p?.error });
+  if (pred == null || typeof pred !== "object" || !("ok" in pred)) {
+    fmeContentLog("brainSuggest:predict empty response", { pred });
+    return;
+  }
+  const p = pred as BrainPredictResult;
+  if (p.ok !== true) {
+    fmeContentLog("brainSuggest:predict failed", { error: p.error });
     return;
   }
 
-  const text = p.reply;
-  let attempt = 0;
-  const trySuggestBg = (): void => {
-    void chrome.runtime
-      .sendMessage({
-        type: FME_BACKGROUND_SHOW_SUGGEST_REPLY,
-        text,
-      })
-      .then((r: unknown) => {
-        const res = r as BgSuggestResult;
-        if (res?.ok === true) {
-          fmeContentLog("brainSuggest:suggest ok via background", { attempt });
-          return;
-        }
-        attempt += 1;
-        if (attempt < DEV_SUGGEST_MAX_ATTEMPTS) {
-          window.setTimeout(trySuggestBg, DEV_SUGGEST_RETRY_MS);
-        } else {
-          fmeContentLog("brainSuggest:suggest gave up", { attempt, error: res?.error });
-        }
-      })
-      .catch((e: unknown) => {
-        attempt += 1;
-        if (attempt < DEV_SUGGEST_MAX_ATTEMPTS) {
-          window.setTimeout(trySuggestBg, DEV_SUGGEST_RETRY_MS);
-        } else {
-          fmeContentLog("brainSuggest:suggest sendMessage failed", e);
-        }
-      });
-  };
-  trySuggestBg();
+  retryGhostSuggestViaBackground(p.reply, {
+    maxAttempts: DEV_SUGGEST_MAX_ATTEMPTS,
+    retryMs: DEV_SUGGEST_RETRY_MS,
+    logScope: "brainSuggest",
+  });
 }
 
 /**

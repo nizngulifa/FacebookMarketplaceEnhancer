@@ -58,12 +58,16 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `src/lib/`           | Shared helpers                                 |
 | `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (dark assistant chip), `suggestReply` (composer ghost text), debug marker |
 | `src/lib/messenger-composer.ts` | Composer discovery for `suggestReply` (strict + loose `contenteditable` heuristics) |
+| `src/lib/brain-config.ts` | Default local brain server URL (`http://127.0.0.1:8765`) + `brainPredictUrl()` |
+| `src/lib/brain-client.ts` | Service worker: `fetch` `POST /v1/predict` (`fetchSellerReply`, `normalizeBrainTurns`) — **no API keys** |
+| `src/lib/thread-to-brain-messages.ts` | Maps `ThreadSnapshot` → brain `ChatInput` turns (`You` → seller) |
+| `src/lib/ghost-suggest-retry.ts` | Retries `FME_BACKGROUND_SHOW_SUGGEST_REPLY` until composer bridge succeeds |
 | `src/lib/fme-ui-host-ids.ts` | Stable DOM ids for injected UI hosts (shared with scripting verify) |
 | `src/lib/prompt-via-scripting.ts` | `runPromptUserOnTab`, `runSuggestReplyOnTab` — inject bridge(s) + call via `scripting` |
-| `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` / `FME_BACKGROUND_SHOW_SUGGEST_REPLY` |
+| `src/background/background.ts` | Service worker: brain predict (`fetch`), `FME_BACKGROUND_SHOW_PROMPT`, `FME_BACKGROUND_SHOW_SUGGEST_REPLY` |
 | `src/content/fme-prompt-bridge.ts` | On-demand bundle: `__fmePromptUser`, `__fmeSuggestReply` for `scripting` |
 | `src/content/fme-composer-probe-bridge.ts` | On-demand bundle: `__fmeProbeComposer` (all-frames composer probe) |
-| `src/content/messenger.ts` | Content script: messages + **dev-only** `promptUser` + `suggestReply` on each full tab load |
+| `src/content/messenger.ts` | Content script: snapshot/prompt/suggest messages + **on each full tab load** assistant chip + brain-driven ghost reply |
 | `dist/`              | Build output (gitignored; run build first)       |
 | `popup.html`         | Popup markup; references `dist/popup.js`       |
 | `popup.css`          | Popup styles                                   |
@@ -96,7 +100,15 @@ All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketp
 
 ### Developer testing (Messenger reload)
 
-For fast iteration, **`src/content/messenger.ts`** on each **full Messenger tab load** sends **`FME_BACKGROUND_SHOW_PROMPT`** / **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** to the service worker (tab id from `sender.tab`), which runs the same **`chrome.scripting`** path as production (`runPromptUserOnTab`, `runSuggestReplyOnTab` with composer frame probe). Suggest is retried from the content script until the worker reports success. Check the page and **DevTools → Console** (`[FME content]`). This is temporary until the orchestrator drives UI; remove or gate it when shipping end-user behavior.
+For fast iteration, **`src/content/messenger.ts`** on each **full Messenger tab load**:
+
+1. Sends **`FME_BACKGROUND_SHOW_PROMPT`** to the service worker (same **`chrome.scripting`** path as production: `runPromptUserOnTab`).
+2. Extracts a **`ThreadSnapshot`**, maps it to brain turns (`thread-to-brain-messages.ts`), then sends **`FME_BACKGROUND_BRAIN_PREDICT`** to the worker. The worker **`fetch`es** the local brain server (`make brain-serve` → `POST http://127.0.0.1:8765/v1/predict`). **Start the brain server and set `OPENAI_API_KEY` on the Python side** or prediction fails (logged as `brainSuggest:predict failed`).
+3. On success, sends **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** with the model `reply` text; **`ghost-suggest-retry.ts`** retries until `runSuggestReplyOnTab` succeeds (composer iframe often mounts late).
+
+Check **DevTools → Console** (`[FME content]`). Remove or gate this auto-run before shipping end-user behavior.
+
+**Further reading:** [docs/brain.md](../../docs/brain.md) (extension ↔ brain MVP), [docs/extension-for-collaborators.md](../../docs/extension-for-collaborators.md).
 
 On some Chrome + `messenger.com` setups, **`chrome.tabs.sendMessage` + `sendResponse` from a content script returns `undefined`** to the caller even when the listener runs. The popup’s **Reload messages** button still uses `sendMessage` + **`FME_GET_THREAD_SNAPSHOT`**; if it returns empty data, reload Messenger or migrate that read path to `chrome.scripting` like **`runPromptUserOnTab`** / **`runSuggestReplyOnTab`** do for writes.
 
@@ -104,7 +116,7 @@ After changing permissions, **reload the extension** on `chrome://extensions` so
 
 ### Protocol constants
 
-See `src/lib/messenger-protocol.ts`: **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`** (content script), **`FME_BACKGROUND_SHOW_PROMPT`**, **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** (service worker → `scripting`).
+See `src/lib/messenger-protocol.ts`: **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`** (content script), **`FME_BACKGROUND_SHOW_PROMPT`**, **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`**, **`FME_BACKGROUND_BRAIN_PREDICT`** (content → worker → localhost `fetch`).
 
 ## Adding features (for future work)
 
