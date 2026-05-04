@@ -112,8 +112,7 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
   }
   d.appendDebugLog(`Step 3 Prompt: tabId=${resolved.tabId}`);
 
-  const text =
-    "Hey there—I haven't actually seen this chat yet. Could you scroll through so I can see it?";
+  const text = "Hi, I'm here to help.";
 
   try {
     const result = await runPromptUserOnTab(resolved.tabId, text);
