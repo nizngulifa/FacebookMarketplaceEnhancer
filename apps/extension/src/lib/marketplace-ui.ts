@@ -28,25 +28,107 @@ export function findMessengerComposer(root: Document): HTMLElement | null {
 const SUGGEST_GHOST_MIN_HEIGHT_PX = 52;
 const SUGGEST_GHOST_MAX_HEIGHT_PX = 220;
 
-function placeSuggestOverlay(host: HTMLElement, composer: HTMLElement): void {
-  const r = composer.getBoundingClientRect();
-  const win = host.ownerDocument.defaultView;
-  const vw = win?.innerWidth ?? 0;
-  const vh = win?.innerHeight ?? 0;
-  const hPad = 10;
-  const vPad = 6;
+function isTransparentCssColor(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (v === "transparent") return true;
+  const m = /^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/.exec(v);
+  if (m) return parseFloat(m[1]) === 0;
+  return false;
+}
 
-  const width = Math.min(Math.max(240, r.width - hPad * 2), Math.max(160, vw - 16));
-  const left = Math.max(8, Math.min(r.left + hPad, vw - width - 8));
-  const top = Math.max(8, r.top + vPad);
-  const roomBelow = vh - top - 12;
-  const maxH = Math.max(SUGGEST_GHOST_MIN_HEIGHT_PX, Math.min(SUGGEST_GHOST_MAX_HEIGHT_PX, roomBelow));
+/** Walk up for a non-transparent background so the overlay covers native placeholder text. */
+function solidBackgroundNear(composer: HTMLElement): string {
+  const win = composer.ownerDocument.defaultView;
+  if (!win) return "#ffffff";
+  let cur: HTMLElement | null = composer;
+  for (let i = 0; i < 8 && cur; i += 1) {
+    const bg = win.getComputedStyle(cur).backgroundColor;
+    if (bg && !isTransparentCssColor(bg)) return bg;
+    cur = cur.parentElement;
+  }
+  return "#ffffff";
+}
+
+type PlaceholderMask = { ariaPlaceholder: string | null; dataPlaceholder: string | null };
+
+function captureAndStripPlaceholderAttrs(el: HTMLElement): PlaceholderMask {
+  const state: PlaceholderMask = {
+    ariaPlaceholder: el.getAttribute("aria-placeholder"),
+    dataPlaceholder: el.getAttribute("data-placeholder"),
+  };
+  el.removeAttribute("aria-placeholder");
+  el.removeAttribute("data-placeholder");
+  return state;
+}
+
+function restorePlaceholderAttrs(el: HTMLElement, prev: PlaceholderMask): void {
+  if (prev.ariaPlaceholder !== null) el.setAttribute("aria-placeholder", prev.ariaPlaceholder);
+  else el.removeAttribute("aria-placeholder");
+  if (prev.dataPlaceholder !== null) el.setAttribute("data-placeholder", prev.dataPlaceholder);
+  else el.removeAttribute("data-placeholder");
+}
+
+/** When siblings aren’t measurable, approximate space left of the typing strip (e.g. “Aa”). */
+const MVP_AA_STRIP_FALLBACK_PX = 34;
+
+function reserveLeftComposerChromePx(composer: HTMLElement): number {
+  let sum = 0;
+  let el = composer.previousElementSibling as HTMLElement | null;
+  while (el) {
+    const br = el.getBoundingClientRect();
+    if (br.width > 2 && br.height > 2) sum += br.width;
+    el = el.previousElementSibling as HTMLElement | null;
+  }
+  const gap = 4;
+  const raw = sum > 0 ? Math.ceil(sum + gap) : MVP_AA_STRIP_FALLBACK_PX;
+  /** Pull the chip slightly left vs measured chrome so it doesn’t sit too far past “Aa”. */
+  const nudgeLeft = 10;
+  return Math.max(0, raw - nudgeLeft);
+}
+
+function placeSuggestOverlay(
+  host: HTMLElement,
+  composer: HTMLElement,
+  ghostEl: HTMLElement,
+  hintEl: HTMLElement,
+): void {
+  const win = composer.ownerDocument.defaultView;
+  if (!win) return;
+  const r = composer.getBoundingClientRect();
+  const cs = win.getComputedStyle(composer);
+  const padL = Math.max(0, parseFloat(cs.paddingLeft) || 0);
+  const padR = Math.max(0, parseFloat(cs.paddingRight) || 0);
+  const padT = Math.max(0, parseFloat(cs.paddingTop) || 0);
+  const padB = Math.max(0, parseFloat(cs.paddingBottom) || 0);
+  const vw = win.innerWidth;
+  const vh = win.innerHeight;
+
+  const aaReserve = reserveLeftComposerChromePx(composer);
+  const contentLeft = r.left + padL + aaReserve;
+  const left = Math.min(Math.max(6, contentLeft), vw - 100);
+  const width = Math.max(100, Math.min(Math.max(0, r.right - padR - left - 8), vw - left - 8));
+  const top = Math.max(4, r.top + padT);
+  const innerH = Math.max(0, r.height - padT - padB);
+  const roomBelow = vh - top - 10;
+  const maxH = Math.max(
+    SUGGEST_GHOST_MIN_HEIGHT_PX,
+    Math.min(SUGGEST_GHOST_MAX_HEIGHT_PX, innerH + 48, roomBelow),
+  );
 
   host.style.left = `${left}px`;
   host.style.top = `${top}px`;
   host.style.width = `${width}px`;
-  host.style.minHeight = `${SUGGEST_GHOST_MIN_HEIGHT_PX}px`;
+  host.style.minHeight = `${Math.max(SUGGEST_GHOST_MIN_HEIGHT_PX, Math.min(innerH + 36, maxH))}px`;
   host.style.maxHeight = `${maxH}px`;
+  host.style.backgroundColor = solidBackgroundNear(composer);
+  const br = cs.borderRadius;
+  if (br && br !== "0px") host.style.borderRadius = br;
+
+  ghostEl.style.fontFamily = cs.fontFamily;
+  ghostEl.style.fontSize = cs.fontSize;
+  ghostEl.style.lineHeight = cs.lineHeight;
+  ghostEl.style.letterSpacing = cs.letterSpacing;
+  hintEl.style.fontFamily = cs.fontFamily;
 }
 
 function commitSuggestionIntoComposer(composer: HTMLElement, text: string): void {
@@ -104,25 +186,35 @@ export function suggestReply(text: string): void {
       display: block;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      min-height: 100%;
+      box-sizing: border-box;
+    }
     .ghost {
       margin: 0;
       padding: 0;
-      color: rgba(100, 116, 139, 0.92);
-      font-size: 15px;
-      line-height: 1.35;
+      color: rgba(71, 85, 105, 0.98);
       white-space: pre-wrap;
       word-break: break-word;
       user-select: none;
+      flex: 0 0 auto;
     }
     .hint {
-      margin: 6px 0 0;
-      font-size: 11px;
+      margin: 4px 0 0;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: rgba(100, 116, 139, 0.75);
+      color: rgba(100, 116, 139, 0.85);
+      flex: 0 0 auto;
     }
   `;
+
+  const wrap = document.createElement("div");
+  wrap.className = "wrap";
 
   const ghost = document.createElement("p");
   ghost.className = "ghost";
@@ -133,11 +225,14 @@ export function suggestReply(text: string): void {
   hint.className = "hint";
   hint.textContent = "Tab to insert · Esc to dismiss";
 
-  shadow.append(style, ghost, hint);
+  wrap.append(ghost, hint);
+  shadow.append(style, wrap);
 
   const root = document.body ?? document.documentElement;
   root.appendChild(host);
-  placeSuggestOverlay(host, activeComposer);
+
+  let savedPlaceholder: PlaceholderMask = captureAndStripPlaceholderAttrs(activeComposer);
+  placeSuggestOverlay(host, activeComposer, ghost, hint);
 
   let relookupTimer: ReturnType<typeof setTimeout> | undefined;
   let giveUpMisses = 0;
@@ -155,9 +250,11 @@ export function suggestReply(text: string): void {
   const rebindToComposer = (next: HTMLElement): void => {
     if (next === activeComposer) return;
     fmeContentLog("suggestReply:composerRebound");
+    restorePlaceholderAttrs(activeComposer, savedPlaceholder);
     activeComposer.removeEventListener("input", onComposerInput);
     ro?.unobserve(activeComposer);
     activeComposer = next;
+    savedPlaceholder = captureAndStripPlaceholderAttrs(activeComposer);
     activeComposer.addEventListener("input", onComposerInput);
     ro?.observe(activeComposer);
   };
@@ -172,6 +269,7 @@ export function suggestReply(text: string): void {
     window.removeEventListener("resize", onScrollOrResize);
     document.removeEventListener("keydown", onKeyDown, true);
     activeComposer.removeEventListener("input", onComposerInput);
+    restorePlaceholderAttrs(activeComposer, savedPlaceholder);
     ro?.disconnect();
     host.remove();
   };
@@ -181,7 +279,7 @@ export function suggestReply(text: string): void {
     if (document.body?.contains(activeComposer)) {
       giveUpMisses = 0;
       clearRelookupTimer();
-      placeSuggestOverlay(host, activeComposer);
+      placeSuggestOverlay(host, activeComposer, ghost, hint);
       return;
     }
     const next = pickMessengerComposerElement(document);
@@ -189,7 +287,7 @@ export function suggestReply(text: string): void {
       giveUpMisses = 0;
       clearRelookupTimer();
       rebindToComposer(next);
-      placeSuggestOverlay(host, activeComposer);
+      placeSuggestOverlay(host, activeComposer, ghost, hint);
       return;
     }
     if (fromTimer) {
@@ -212,7 +310,7 @@ export function suggestReply(text: string): void {
     if (document.body?.contains(activeComposer)) {
       giveUpMisses = 0;
       clearRelookupTimer();
-      placeSuggestOverlay(host, activeComposer);
+      placeSuggestOverlay(host, activeComposer, ghost, hint);
       return;
     }
     attemptRebindOrTeardown(false);
