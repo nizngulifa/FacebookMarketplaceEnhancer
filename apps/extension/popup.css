@@ -11,8 +11,8 @@ body {
 }
 
 .panel {
-  width: 360px;
-  max-height: 520px;
+  width: 380px;
+  max-height: 640px;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
@@ -33,6 +33,7 @@ body {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -54,6 +55,86 @@ body {
 
 .btn:active {
   background: #1464d4;
+}
+
+.btn-secondary {
+  flex: 1;
+  min-width: 0;
+  color: #1877f2;
+  background: #fff;
+  border: 1px solid #1877f2;
+}
+
+.btn-secondary:hover {
+  background: #e7f3ff;
+}
+
+.btn-secondary:active {
+  background: #d8ebfc;
+}
+
+.selftest {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid #e3e5e8;
+}
+
+.selftest-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.selftest-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #5c5c5c;
+}
+
+.selftest-toolbar {
+  flex-wrap: wrap;
+}
+
+.btn-tool {
+  flex: 1 1 30%;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.btn-clear {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #444;
+  background: #fff;
+  border: 1px solid #cfd2d8;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-clear:hover {
+  background: #f0f2f5;
+}
+
+.debug-log {
+  margin: 0;
+  min-height: 72px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #d4d4d4;
+  background: #1e1e1e;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .meta {

@@ -3,7 +3,10 @@
   "name": "Facebook Marketplace Enhancer",
   "version": "1.0.0",
   "description": "Read mounted Messenger thread messages from the page for Marketplace workflows.",
-  "permissions": ["tabs"],
+  "permissions": ["tabs", "scripting"],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
   "host_permissions": [
     "https://www.messenger.com/*",
     "https://messenger.com/*"
