@@ -10,7 +10,7 @@ function removeExistingPromptHost(): void {
 export type DebugMarkerRect = { x: number; y: number; width: number; height: number };
 
 /**
- * Step 2 — minimal light-DOM injection (no shadow) to verify the tab can be written.
+ * Dev-only: small chip to verify DOM writes. Docked on the inline-end edge (usually right in LTR).
  */
 export function injectDebugMarker(): { rect: DebugMarkerRect } {
   fmeContentLog("injectDebugMarker:start");
@@ -23,7 +23,7 @@ export function injectDebugMarker(): { rect: DebugMarkerRect } {
   el.style.cssText = [
     "position:fixed",
     "top:12px",
-    "left:12px",
+    "inset-inline-end:12px",
     "z-index:2147483647",
     "margin:0",
     "padding:10px 14px",
@@ -46,7 +46,8 @@ export function injectDebugMarker(): { rect: DebugMarkerRect } {
 }
 
 /**
- * Step 3 — dismissible overlay (`MarketplaceUI.promptUser`).
+ * Non-blocking instruction panel (`MarketplaceUI.promptUser`): docked on the inline-end edge so the
+ * user can still scroll the thread (no modal backdrop). Dismiss or Escape to hide.
  */
 export function promptUser(message: string): void {
   fmeContentLog("promptUser:start", { length: message.length });
@@ -57,15 +58,17 @@ export function promptUser(message: string): void {
   host.setAttribute("data-fme", "marketplace-ui-prompt");
   host.style.cssText = [
     "position:fixed",
-    "inset:0",
-    "width:100%",
-    "height:100%",
+    "inset-inline-end:12px",
+    "inset-block-start:max(72px,12vh)",
+    "width:min(300px,40vw)",
+    "max-height:min(46vh,400px)",
     "margin:0",
     "padding:0",
     "border:0",
-    "pointer-events:none",
     "z-index:2147483647",
+    "pointer-events:auto",
     "display:block",
+    "box-sizing:border-box",
   ].join(";");
 
   const shadow = host.attachShadow({ mode: "open" });
@@ -75,36 +78,28 @@ export function promptUser(message: string): void {
     :host {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    .backdrop {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      pointer-events: auto;
+    .panel {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      box-sizing: border-box;
-      background: rgba(0, 0, 0, 0.45);
-    }
-    .card {
-      max-width: 420px;
-      width: 100%;
-      padding: 20px 22px;
-      border-radius: 12px;
+      flex-direction: column;
+      gap: 10px;
+      max-height: inherit;
+      overflow: auto;
+      padding: 14px 16px;
+      border-radius: 10px;
       background: #fff;
       color: #1a1a1a;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+      border: 1px solid #ccd0d5;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
       box-sizing: border-box;
     }
     .title {
-      margin: 0 0 10px;
-      font-size: 15px;
+      margin: 0;
+      font-size: 14px;
       font-weight: 600;
     }
     .body {
-      margin: 0 0 18px;
-      font-size: 14px;
+      margin: 0;
+      font-size: 13px;
       line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
@@ -112,12 +107,11 @@ export function promptUser(message: string): void {
     .actions {
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
     }
     button {
       font: inherit;
       font-weight: 600;
-      padding: 8px 14px;
+      padding: 7px 12px;
       border-radius: 8px;
       border: none;
       cursor: pointer;
@@ -133,19 +127,15 @@ export function promptUser(message: string): void {
     }
   `;
 
-  const backdrop = document.createElement("div");
-  backdrop.className = "backdrop";
-  backdrop.setAttribute("role", "dialog");
-  backdrop.setAttribute("aria-modal", "true");
-  backdrop.setAttribute("aria-labelledby", "fme-prompt-title");
-
-  const card = document.createElement("div");
-  card.className = "card";
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-label", "Marketplace Enhancer instructions");
 
   const title = document.createElement("h2");
   title.className = "title";
   title.id = "fme-prompt-title";
-  title.textContent = "Marketplace Enhancer";
+  title.textContent = "Next step";
 
   const body = document.createElement("p");
   body.className = "body";
@@ -169,15 +159,11 @@ export function promptUser(message: string): void {
   };
 
   dismissBtn.addEventListener("click", dismiss);
-  backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) dismiss();
-  });
   document.addEventListener("keydown", onKeyDown, true);
 
   actions.appendChild(dismissBtn);
-  card.append(title, body, actions);
-  backdrop.appendChild(card);
-  shadow.append(style, backdrop);
+  panel.append(title, body, actions);
+  shadow.append(style, panel);
   const root = document.body ?? document.documentElement;
   root.appendChild(host);
   fmeContentLog("promptUser:mounted", { hostId: FME_PROMPT_HOST_ID });

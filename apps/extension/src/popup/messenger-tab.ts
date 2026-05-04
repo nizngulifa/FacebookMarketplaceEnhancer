@@ -1,5 +1,9 @@
 /** Resolve the focused Messenger tab (popup timing makes `currentWindow` alone unreliable). */
 
+import { isMessengerUrl } from "../lib/messenger-url";
+
+export { isMessengerUrl };
+
 export function messengerThreadIdFromUrl(url: string): string | undefined {
   try {
     const u = new URL(url);
@@ -8,16 +12,6 @@ export function messengerThreadIdFromUrl(url: string): string | undefined {
     return m?.[1];
   } catch {
     return undefined;
-  }
-}
-
-export function isMessengerUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    const u = new URL(url);
-    return u.hostname === "messenger.com" || u.hostname.endsWith(".messenger.com");
-  } catch {
-    return false;
   }
 }
 

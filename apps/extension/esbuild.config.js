@@ -7,6 +7,7 @@ async function run() {
     entryPoints: {
       popup: "src/popup/popup.ts",
       content: "src/content/messenger.ts",
+      background: "src/background/background.ts",
       fmePromptBridge: "src/content/fme-prompt-bridge.ts",
     },
     bundle: true,

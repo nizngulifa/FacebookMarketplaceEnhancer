@@ -55,8 +55,10 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `src/popup/messenger-tab.ts` | Resolve the active `messenger.com` tab from the popup |
 | `src/popup/write-path-selftest.ts` | Dev-only “Write path” steps (scripting API) |
 | `src/lib/`           | Shared helpers                                 |
-| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser`, debug marker |
-| `src/content/fme-prompt-bridge.ts` | On-demand bundle: exposes `promptUser` for `scripting.executeScript` |
+| `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (side panel), debug marker |
+| `src/lib/prompt-via-scripting.ts` | `runPromptUserOnTab` — inject bridge + call `promptUser` via `scripting` |
+| `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` → `runPromptUserOnTab` |
+| `src/content/fme-prompt-bridge.ts` | On-demand bundle: assigns `globalThis.__fmePromptUser` for `scripting` |
 | `dist/`              | Build output (gitignored; run build first)       |
 | `popup.html`         | Popup markup; references `dist/popup.js`       |
 | `popup.css`          | Popup styles                                   |
@@ -67,15 +69,24 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 
 All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketplace-ui.ts`** so we do not scatter `document.createElement` across the codebase.
 
-- **`promptUser(message)`** — dismissible modal overlay (shadow DOM + full-viewport host). Escape, “Dismiss”, or backdrop click closes it.
+- **`promptUser(message)`** — dismissible **side panel** on the **inline-end** edge (usually right in LTR). It does **not** use a full-page dimmer so the user can **keep scrolling** the thread while reading instructions (e.g. “scroll up to load older messages”). **Dismiss** or **Escape** closes it.
 - **Debug marker** — `injectDebugMarker()` / `#fme-debug-marker` for manual verification only.
+
+### Who can call `promptUser`?
+
+| Caller | Supported today? | How |
+|--------|------------------|-----|
+| **Random website / REST API** | **No** | Browsers do not expose extension APIs to the open web. |
+| **Same extension (popup, options, future orchestrator code)** | **Yes** | Prefer `chrome.runtime.sendMessage` to the **service worker** with **`FME_BACKGROUND_SHOW_PROMPT`** `{ message, tabId? }`. The worker runs `runPromptUserOnTab` (`src/lib/prompt-via-scripting.ts`). If `tabId` is omitted, the worker picks the focused `messenger.com` tab (same heuristics as the popup). |
+| **Content script** (e.g. message from another extension context) | **Yes** | `chrome.tabs.sendMessage` with **`FME_PROMPT_USER`** still calls `promptUser` in-page (deferred `sendResponse`); on some setups the **response payload** back to the caller may be unreliable—use the **background** path above if you need a confirmed return value. |
+| **Trusted web app** | **Not wired** | Possible follow-up: `externally_connectable` + `chrome.runtime.sendMessage` from an allow-listed origin, or a **WebSocket / fetch loop** in the service worker that listens to your server then calls `runPromptUserOnTab`. |
 
 ### How the popup self-test works (important for contributors)
 
 On some Chrome + `messenger.com` setups, **`chrome.tabs.sendMessage` + `sendResponse` from a content script returns `undefined`** to the caller even when the listener runs. The popup’s **Write path (self-test)** therefore uses **`chrome.scripting.executeScript`** instead:
 
 1. **Ping / marker** — `executeScript` with `allFrames: true` so code runs in the same document the user sees (Messenger often has a single meaningful frame in practice; `allFrames` is still the right default for diagnostics).
-2. **Prompt** — inject `dist/fmePromptBridge.js` (assigns `globalThis.__fmePromptUser`), then a tiny `func` calls it. Same isolated world as manifest content scripts.
+2. **Prompt** — uses **`runPromptUserOnTab`** (bridge file + `func`), same as the service worker.
 
 After changing permissions, **reload the extension** on `chrome://extensions` so Chrome grants them (e.g. `scripting`).
 
@@ -83,12 +94,12 @@ After changing permissions, **reload the extension** on `chrome://extensions` so
 
 ### Protocol constants
 
-See `src/lib/messenger-protocol.ts`. **`FME_PROMPT_USER`** is handled in the content script for non-popup callers (e.g. future orchestrator).
+See `src/lib/messenger-protocol.ts`: **`FME_PROMPT_USER`** (content script), **`FME_BACKGROUND_SHOW_PROMPT`** (service worker → `scripting`).
 
 ## Adding features (for future work)
 
 - **New UI surface** — add an entry in `esbuild.config.js` (`entryPoints`), reference the emitted script from your HTML.
-- **Background / service worker** — add e.g. `src/background/background.ts`, register in `manifest.json` under `background.service_worker` (bundling one file is simplest for MV3).
+- **Background / service worker** — `src/background/background.ts` → `dist/background.js`; registered in `manifest.json`.
 - **Content scripts** — add under `src/content/`, declare in `manifest.json` with `matches`; bundle each entry with esbuild.
 - **Permissions** — add only what you need; keeps review and user trust simpler.
 

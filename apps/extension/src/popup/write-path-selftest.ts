@@ -1,6 +1,5 @@
+import { runPromptUserOnTab } from "../lib/prompt-via-scripting";
 import { getMessengerTab } from "./messenger-tab";
-
-export const PROMPT_BRIDGE_FILE = "dist/fmePromptBridge.js";
 
 /** Must match `FME_DEBUG_MARKER_ID` in `src/lib/marketplace-ui.ts` (injected `func` cannot close over imports). */
 const INJECTED_MARKER_ID = "fme-debug-marker";
@@ -67,7 +66,7 @@ export async function runSelfTestMarker(d: SelfTestDeps): Promise<void> {
         el.style.cssText = [
           "position:fixed",
           "top:12px",
-          "left:12px",
+          "inset-inline-end:12px",
           "z-index:2147483647",
           "margin:0",
           "padding:10px 14px",
@@ -104,9 +103,7 @@ export async function runSelfTestMarker(d: SelfTestDeps): Promise<void> {
 }
 
 export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
-  d.appendDebugLog(
-    "Step 3 Prompt: button clicked (inject bridge via scripting, then run promptUser in main frame)",
-  );
+  d.appendDebugLog("Step 3 Prompt: button clicked (runPromptUserOnTab → side panel, main frame)");
   const resolved = await d.getMessengerTab();
   if ("error" in resolved) {
     d.appendDebugLog(`Step 3 Prompt: tab error — ${resolved.error}`);
@@ -116,42 +113,21 @@ export async function runSelfTestPrompt(d: SelfTestDeps): Promise<void> {
   d.appendDebugLog(`Step 3 Prompt: tabId=${resolved.tabId}`);
 
   const text =
-    "If you see this overlay, promptUser works. Dismiss, Escape, or click backdrop. Reply with what you saw + the log lines below.";
+    "Scroll to the very top of this chat until older messages stop loading. You can dismiss this note anytime; it does not block scrolling.";
 
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId: resolved.tabId, allFrames: false },
-      files: [PROMPT_BRIDGE_FILE],
-    });
-    d.appendDebugLog(`Step 3 Prompt: bridge file injected — ${PROMPT_BRIDGE_FILE}`);
-
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: resolved.tabId, allFrames: false },
-      args: [text],
-      func: (message: string) => {
-        type G = { __fmePromptUser?: (m: string) => void };
-        const fn = (globalThis as G).__fmePromptUser;
-        if (typeof fn !== "function") {
-          return { ok: false as const, error: "prompt bridge missing after file inject" };
-        }
-        try {
-          fn(message);
-          return { ok: true as const };
-        } catch (e) {
-          return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
-        }
-      },
-    });
-    d.appendDebugLog(`Step 3 Prompt: run result JSON — ${JSON.stringify(results)}`);
-    const first = results[0]?.result as { ok?: boolean; error?: string } | undefined;
-    if (first && first.ok === false) {
-      d.setStatus(`Prompt failed: ${first.error ?? "unknown"}`);
+    const result = await runPromptUserOnTab(resolved.tabId, text);
+    d.appendDebugLog(`Step 3 Prompt: result JSON — ${JSON.stringify(result)}`);
+    if (!result.ok) {
+      d.setStatus(`Prompt failed: ${result.error}`);
       return;
     }
-    d.setStatus("Prompt ran in main frame — check Messenger for dim overlay + card.");
+    d.setStatus(
+      "Prompt ran — look for the white instruction card on the inline-end (usually right). Scroll the chat while it is open.",
+    );
   } catch (err) {
     d.appendDebugLog(
-      `Step 3 Prompt: executeScript threw — ${err instanceof Error ? err.message : String(err)}`,
+      `Step 3 Prompt: runPromptUserOnTab threw — ${err instanceof Error ? err.message : String(err)}`,
     );
     d.setStatus("Prompt failed — see log.");
   }
