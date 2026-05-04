@@ -26,8 +26,7 @@ Use this doc to **ship changes to `apps/extension/`** or to **hook the extension
 | **`src/content/fme-prompt-bridge.ts`** | Built to **`dist/fmePromptBridge.js`**. Assigns `globalThis.__fmePromptUser` / `__fmeSuggestReply` in the page’s **extension isolated world**. |
 | **`src/content/fme-composer-probe-bridge.ts`** | Built to **`dist/fmeComposerProbeBridge.js`**. Assigns `globalThis.__fmeProbeComposer` for all-frame composer discovery before `suggestReply`. |
 | **`src/background/background.ts`** | **Service worker** — handles **`FME_BACKGROUND_SHOW_PROMPT`** and **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`**. |
-| **`src/content/messenger.ts`** | Content script: **`FME_GET_THREAD_SNAPSHOT`**, **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`** (deferred `sendResponse`). Popup “Reload messages” still uses `sendMessage` for snapshot; **responses to the caller can be `undefined`** on some Chrome + Messenger setups — prefer the **scripting** helpers from extension UI. |
-| **`src/popup/write-path-selftest.ts`** | Dev **Write path** self-test (Ping / Marker / Prompt / Suggest + trace log for suggest). |
+| **`src/content/messenger.ts`** | Content script: **`FME_GET_THREAD_SNAPSHOT`**, **`FME_PROMPT_USER`**, **`FME_SUGGEST_REPLY`**, plus **dev-only** messages to the worker (`FME_BACKGROUND_SHOW_*`, tab from `sender.tab`) on each full Messenger load so writes use the **scripting** path (composer iframe). Popup “Reload messages” still uses `sendMessage` for snapshot; **responses to the caller can be `undefined`** on some Chrome + Messenger setups — prefer the **scripting** helpers from extension UI for writes that need a reliable return value. |
 
 ---
 
@@ -115,7 +114,7 @@ Nothing in this repo yet lets **arbitrary internet callers** or **your REST API*
 ## 7. Verification checklist (before you PR)
 
 - [ ] `make extension-build` and `npm run typecheck:extension` pass.
-- [ ] Self-test **1 → 2 → 3 → 4** on a real Messenger tab (extension popup).
+- [ ] Full **reload** of a Messenger thread tab: confirm dev **prompt** + **suggest** appear (until replaced by orchestrator-driven behavior).
 - [ ] If you changed `promptUser` visuals: confirm scroll + dismiss (**Got it** / Escape).
 - [ ] If you changed `suggestReply`: confirm ghost visibility, **Tab** inserts, **Escape** dismisses, typing clears.
 
@@ -123,5 +122,5 @@ Nothing in this repo yet lets **arbitrary internet callers** or **your REST API*
 
 ## 8. Further reading
 
-- [apps/extension/README.md](../apps/extension/README.md) — dev loop, self-test scripting vs `sendMessage`, layout table.
+- [apps/extension/README.md](../apps/extension/README.md) — dev loop, Messenger reload testing vs `sendMessage` snapshot, layout table.
 - [AGENTS.md](../AGENTS.md) — agent / automation notes for this repo.

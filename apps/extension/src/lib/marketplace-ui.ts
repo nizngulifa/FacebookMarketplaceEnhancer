@@ -4,7 +4,10 @@ import {
   FME_PROMPT_HOST_ID,
   FME_SUGGEST_HOST_ID,
 } from "./fme-ui-host-ids";
-import { listMessengerComposerCandidates, pickMessengerComposerElement } from "./messenger-composer";
+import {
+  listMessengerComposerCandidates,
+  pickMessengerComposerElement,
+} from "./messenger-composer";
 
 export { FME_DEBUG_MARKER_ID, FME_PROMPT_HOST_ID, FME_SUGGEST_HOST_ID };
 
@@ -58,13 +61,14 @@ function commitSuggestionIntoComposer(composer: HTMLElement, text: string): void
 /**
  * Ghost reply suggestion (`MarketplaceUI.suggestReply`): muted overlay on the message composer.
  * **Tab** inserts the text into the field; **Escape** dismisses. Typing in the composer clears the ghost.
+ * If the composer node is replaced (e.g. Messenger/React hydration), we rebind to the new element instead of tearing down immediately.
  */
 export function suggestReply(text: string): void {
   fmeContentLog("suggestReply:start", { length: text.length });
   removeExistingSuggestHost();
 
-  const composer = findMessengerComposer(document);
-  if (!composer) {
+  const initial = findMessengerComposer(document);
+  if (!initial) {
     const candidates = listMessengerComposerCandidates(document);
     fmeContentLog("suggestReply:no_composer", {
       strictTextbox: document.querySelectorAll('[contenteditable="true"][role="textbox"]').length,
@@ -73,6 +77,9 @@ export function suggestReply(text: string): void {
     });
     throw new Error("composer_not_found");
   }
+
+  /** React / Messenger often replace the composer node after first paint; keep rebounding to the live node. */
+  let activeComposer: HTMLElement = initial;
 
   const host = document.createElement("div");
   host.id = FME_SUGGEST_HOST_ID;
@@ -130,14 +137,29 @@ export function suggestReply(text: string): void {
 
   const root = document.body ?? document.documentElement;
   root.appendChild(host);
-  placeSuggestOverlay(host, composer);
+  placeSuggestOverlay(host, activeComposer);
 
-  const syncPosition = (): void => {
-    if (!document.body?.contains(composer)) {
-      teardown("composer_removed");
-      return;
+  let relookupTimer: ReturnType<typeof setTimeout> | undefined;
+  let giveUpMisses = 0;
+  const MAX_COMPOSER_RELOOKUPS = 45;
+
+  const clearRelookupTimer = (): void => {
+    if (relookupTimer != undefined) {
+      clearTimeout(relookupTimer);
+      relookupTimer = undefined;
     }
-    placeSuggestOverlay(host, composer);
+  };
+
+  let ro: ResizeObserver | undefined;
+
+  const rebindToComposer = (next: HTMLElement): void => {
+    if (next === activeComposer) return;
+    fmeContentLog("suggestReply:composerRebound");
+    activeComposer.removeEventListener("input", onComposerInput);
+    ro?.unobserve(activeComposer);
+    activeComposer = next;
+    activeComposer.addEventListener("input", onComposerInput);
+    ro?.observe(activeComposer);
   };
 
   let tornDown = false;
@@ -145,12 +167,55 @@ export function suggestReply(text: string): void {
     if (tornDown) return;
     tornDown = true;
     fmeContentLog("suggestReply:teardown", { reason });
+    clearRelookupTimer();
     window.removeEventListener("scroll", onScrollOrResize, true);
     window.removeEventListener("resize", onScrollOrResize);
     document.removeEventListener("keydown", onKeyDown, true);
-    composer.removeEventListener("input", onComposerInput);
+    activeComposer.removeEventListener("input", onComposerInput);
     ro?.disconnect();
     host.remove();
+  };
+
+  const attemptRebindOrTeardown = (fromTimer: boolean): void => {
+    if (tornDown) return;
+    if (document.body?.contains(activeComposer)) {
+      giveUpMisses = 0;
+      clearRelookupTimer();
+      placeSuggestOverlay(host, activeComposer);
+      return;
+    }
+    const next = pickMessengerComposerElement(document);
+    if (next) {
+      giveUpMisses = 0;
+      clearRelookupTimer();
+      rebindToComposer(next);
+      placeSuggestOverlay(host, activeComposer);
+      return;
+    }
+    if (fromTimer) {
+      giveUpMisses += 1;
+      if (giveUpMisses >= MAX_COMPOSER_RELOOKUPS) {
+        teardown("composer_removed");
+        return;
+      }
+    }
+    if (relookupTimer === undefined) {
+      relookupTimer = window.setTimeout(() => {
+        relookupTimer = undefined;
+        attemptRebindOrTeardown(true);
+      }, 120);
+    }
+  };
+
+  const syncPosition = (): void => {
+    if (tornDown) return;
+    if (document.body?.contains(activeComposer)) {
+      giveUpMisses = 0;
+      clearRelookupTimer();
+      placeSuggestOverlay(host, activeComposer);
+      return;
+    }
+    attemptRebindOrTeardown(false);
   };
 
   const onScrollOrResize = (): void => {
@@ -172,24 +237,27 @@ export function suggestReply(text: string): void {
     if (e.key === "Tab" && !e.repeat) {
       e.preventDefault();
       committingSuggestion = true;
-      commitSuggestionIntoComposer(composer, text);
+      const target =
+        document.body?.contains(activeComposer) ? activeComposer : pickMessengerComposerElement(document);
+      if (target) {
+        commitSuggestionIntoComposer(target, text);
+      }
       committingSuggestion = false;
       teardown("tab_accept");
     }
   };
 
-  let ro: ResizeObserver | undefined;
   if (typeof ResizeObserver !== "undefined") {
     ro = new ResizeObserver(() => {
       syncPosition();
     });
-    ro.observe(composer);
+    ro.observe(activeComposer);
   }
 
   window.addEventListener("scroll", onScrollOrResize, true);
   window.addEventListener("resize", onScrollOrResize);
   document.addEventListener("keydown", onKeyDown, true);
-  composer.addEventListener("input", onComposerInput);
+  activeComposer.addEventListener("input", onComposerInput);
 
   fmeContentLog("suggestReply:mounted", { hostId: FME_SUGGEST_HOST_ID });
 }

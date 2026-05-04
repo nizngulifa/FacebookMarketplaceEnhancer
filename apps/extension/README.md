@@ -55,7 +55,6 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `manifest.json`      | Extension capabilities and entrypoints         |
 | `src/popup/`         | Popup entry (`popup.ts` → `dist/popup.js`)     |
 | `src/popup/messenger-tab.ts` | Resolve the active `messenger.com` tab from the popup |
-| `src/popup/write-path-selftest.ts` | Dev-only “Write path” steps (scripting API) |
 | `src/lib/`           | Shared helpers                                 |
 | `src/lib/marketplace-ui.ts` | **`MarketplaceUI` write surface** — `promptUser` (dark assistant chip), `suggestReply` (composer ghost text), debug marker |
 | `src/lib/messenger-composer.ts` | Composer discovery for `suggestReply` (strict + loose `contenteditable` heuristics) |
@@ -64,6 +63,7 @@ From repo root: `npm run build:extension`, `npm run watch:extension`, `npm run t
 | `src/background/background.ts` | Service worker: `FME_BACKGROUND_SHOW_PROMPT` / `FME_BACKGROUND_SHOW_SUGGEST_REPLY` |
 | `src/content/fme-prompt-bridge.ts` | On-demand bundle: `__fmePromptUser`, `__fmeSuggestReply` for `scripting` |
 | `src/content/fme-composer-probe-bridge.ts` | On-demand bundle: `__fmeProbeComposer` (all-frames composer probe) |
+| `src/content/messenger.ts` | Content script: messages + **dev-only** `promptUser` + `suggestReply` on each full tab load |
 | `dist/`              | Build output (gitignored; run build first)       |
 | `popup.html`         | Popup markup; references `dist/popup.js`       |
 | `popup.css`          | Popup styles                                   |
@@ -94,17 +94,13 @@ All Messenger DOM **writes** for copilot UX should go through **`src/lib/marketp
 | **Same extension (popup, service worker, future orchestrator)** | **Yes** | Prefer `chrome.runtime.sendMessage` with **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** `{ text, tabId? }`. The worker runs **`runSuggestReplyOnTab`** (composer probe + `fmePromptBridge.js` into the chosen frame). |
 | **Content script** | **Yes** | `chrome.tabs.sendMessage` with **`FME_SUGGEST_REPLY`** `{ text }` (same caveats as `FME_PROMPT_USER` about flaky `sendResponse`). |
 
-### How the popup self-test works (important for contributors)
+### Developer testing (Messenger reload)
 
-On some Chrome + `messenger.com` setups, **`chrome.tabs.sendMessage` + `sendResponse` from a content script returns `undefined`** to the caller even when the listener runs. The popup’s **Write path (self-test)** therefore uses **`chrome.scripting.executeScript`** instead:
+For fast iteration, **`src/content/messenger.ts`** on each **full Messenger tab load** sends **`FME_BACKGROUND_SHOW_PROMPT`** / **`FME_BACKGROUND_SHOW_SUGGEST_REPLY`** to the service worker (tab id from `sender.tab`), which runs the same **`chrome.scripting`** path as production (`runPromptUserOnTab`, `runSuggestReplyOnTab` with composer frame probe). Suggest is retried from the content script until the worker reports success. Check the page and **DevTools → Console** (`[FME content]`). This is temporary until the orchestrator drives UI; remove or gate it when shipping end-user behavior.
 
-1. **Ping / marker** — `executeScript` with `allFrames: true` so code runs in the same document the user sees (Messenger often has a single meaningful frame in practice; `allFrames` is still the right default for diagnostics).
-2. **Prompt** — uses **`runPromptUserOnTab`** (bridge file + `func`), same as the service worker.
-3. **Suggest** — uses **`runSuggestReplyOnTab`** (injects `fmeComposerProbeBridge.js` all-frames to pick `frameId`, then `fmePromptBridge.js` + `suggestReply`). The popup log prints a **trace** (probe rows, verify rect) for debugging.
+On some Chrome + `messenger.com` setups, **`chrome.tabs.sendMessage` + `sendResponse` from a content script returns `undefined`** to the caller even when the listener runs. The popup’s **Reload messages** button still uses `sendMessage` + **`FME_GET_THREAD_SNAPSHOT`**; if it returns empty data, reload Messenger or migrate that read path to `chrome.scripting` like **`runPromptUserOnTab`** / **`runSuggestReplyOnTab`** do for writes.
 
 After changing permissions, **reload the extension** on `chrome://extensions` so Chrome grants them (e.g. `scripting`).
-
-**Reload messages** still uses `tabs.sendMessage` + `FME_GET_THREAD_SNAPSHOT`; if that returns empty data, reload Messenger or migrate that read path to `executeScript` the same way.
 
 ### Protocol constants
 

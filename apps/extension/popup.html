@@ -13,20 +13,13 @@
       <div class="toolbar">
         <button type="button" class="btn" id="refresh">Reload messages</button>
       </div>
-      <section class="selftest" aria-label="Write path self-test">
-        <h2 class="selftest-title">Write path (self-test)</h2>
+      <section class="selftest" aria-label="Developer log">
+        <h2 class="selftest-title">Log</h2>
         <p class="selftest-hint">
-          Use messenger.com. After updating the extension, reload it on chrome://extensions (needed for the
-          <code>scripting</code> permission), then reload the Messenger tab. Run 1 → 2 → 3 (and 4 for suggest); copy the log when reporting
-          results. Step 4 tests ghost reply text on the composer.
+          On each <strong>full Messenger tab reload</strong>, the extension shows a short assistant note and a ghost
+          reply suggestion on the page (see browser console <code>[FME content]</code> for details). Use this log
+          for popup-related notes.
         </p>
-        <div class="toolbar selftest-toolbar">
-          <button type="button" class="btn btn-tool" id="st-ping">1 — Ping</button>
-          <button type="button" class="btn btn-tool" id="st-marker">2 — Marker</button>
-          <button type="button" class="btn btn-tool" id="st-prompt">3 — Prompt</button>
-          <button type="button" class="btn btn-tool" id="st-suggest">4 — Suggest</button>
-        </div>
-        <button type="button" class="btn-clear" id="st-clear">Clear log</button>
         <pre class="debug-log" id="debug-log" aria-live="polite"></pre>
       </section>
       <p class="meta" id="meta" hidden></p>

@@ -1,12 +1,6 @@
 import type { ThreadSnapshot } from "../lib/messenger-extract";
 import { FME_GET_THREAD_SNAPSHOT } from "../lib/messenger-protocol";
 import { getMessengerTab, messengerThreadIdFromUrl } from "./messenger-tab";
-import {
-  runSelfTestMarker,
-  runSelfTestPing,
-  runSelfTestPrompt,
-  runSelfTestSuggestReply,
-} from "./write-path-selftest";
 import { setStatus } from "../lib/status";
 
 function appendDebugLog(line: string): void {
@@ -16,12 +10,6 @@ function appendDebugLog(line: string): void {
   el.textContent += `[${stamp}] ${line}\n`;
   el.scrollTop = el.scrollHeight;
   console.info(`[FME popup] ${line}`);
-}
-
-function clearDebugLog(): void {
-  const el = document.getElementById("debug-log");
-  if (!el) return;
-  el.textContent = "";
 }
 
 function setMeta(text: string, visible: boolean): void {
@@ -76,7 +64,7 @@ async function loadSnapshot(): Promise<void> {
 
   if (snapshot == null) {
     setStatus(
-      "Reload messages returned no data (same channel issue as self-test had). Reload Messenger; thread read still uses messaging until migrated.",
+      "Reload messages returned no data (known Chrome + Messenger channel issue). Reload Messenger and try again.",
     );
     setMeta("", false);
     renderMessages({ logFound: false, messages: [] });
@@ -98,35 +86,14 @@ async function loadSnapshot(): Promise<void> {
   renderMessages(snapshot);
 }
 
-const selfTestDeps = {
-  getMessengerTab,
-  appendDebugLog,
-  setStatus,
-};
-
 function main(): void {
   document.getElementById("refresh")?.addEventListener("click", () => {
     void loadSnapshot();
   });
 
-  document.getElementById("st-ping")?.addEventListener("click", () => {
-    void runSelfTestPing(selfTestDeps);
-  });
-  document.getElementById("st-marker")?.addEventListener("click", () => {
-    void runSelfTestMarker(selfTestDeps);
-  });
-  document.getElementById("st-prompt")?.addEventListener("click", () => {
-    void runSelfTestPrompt(selfTestDeps);
-  });
-  document.getElementById("st-suggest")?.addEventListener("click", () => {
-    void runSelfTestSuggestReply(selfTestDeps);
-  });
-  document.getElementById("st-clear")?.addEventListener("click", () => {
-    clearDebugLog();
-    appendDebugLog("Log cleared.");
-  });
-
-  appendDebugLog("Popup opened — self-test ready.");
+  appendDebugLog(
+    "Popup opened — dev prompt + suggest run on Messenger full reload; use Reload messages for the list below.",
+  );
   void loadSnapshot();
 }
 

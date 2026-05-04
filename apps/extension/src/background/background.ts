@@ -19,7 +19,7 @@ async function activeMessengerTabId(): Promise<number | undefined> {
 chrome.runtime.onMessage.addListener(
   (
     message: { type?: string; message?: string; tabId?: number },
-    _sender,
+    sender,
     sendResponse: (r: { ok: true } | { ok: false; error: string }) => void,
   ) => {
     if (message?.type !== FME_BACKGROUND_SHOW_PROMPT || typeof message.message !== "string") {
@@ -31,13 +31,14 @@ chrome.runtime.onMessage.addListener(
     void (async () => {
       try {
         const explicit = typeof message.tabId === "number" ? message.tabId : undefined;
-        const tabId = explicit ?? (await activeMessengerTabId());
+        const fromSender = sender.tab?.id;
+        const tabId = explicit ?? fromSender ?? (await activeMessengerTabId());
         if (tabId == null) {
           sendResponse({ ok: false, error: "no_messenger_tab" });
           return;
         }
-        if (explicit != null) {
-          const t = await chrome.tabs.get(explicit);
+        if (explicit != null || fromSender != null) {
+          const t = await chrome.tabs.get(tabId);
           if (!isMessengerUrl(t.url)) {
             sendResponse({ ok: false, error: "tab_not_messenger" });
             return;
@@ -57,7 +58,7 @@ chrome.runtime.onMessage.addListener(
 chrome.runtime.onMessage.addListener(
   (
     message: { type?: string; text?: string; tabId?: number },
-    _sender,
+    sender,
     sendResponse: (
       r: { ok: true; logs: string[] } | { ok: false; error: string; logs?: string[] },
     ) => void,
@@ -71,13 +72,14 @@ chrome.runtime.onMessage.addListener(
     void (async () => {
       try {
         const explicit = typeof message.tabId === "number" ? message.tabId : undefined;
-        const tabId = explicit ?? (await activeMessengerTabId());
+        const fromSender = sender.tab?.id;
+        const tabId = explicit ?? fromSender ?? (await activeMessengerTabId());
         if (tabId == null) {
           sendResponse({ ok: false, error: "no_messenger_tab" });
           return;
         }
-        if (explicit != null) {
-          const t = await chrome.tabs.get(explicit);
+        if (explicit != null || fromSender != null) {
+          const t = await chrome.tabs.get(tabId);
           if (!isMessengerUrl(t.url)) {
             sendResponse({ ok: false, error: "tab_not_messenger" });
             return;
